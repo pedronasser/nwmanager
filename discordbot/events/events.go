@@ -429,7 +429,7 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 	footer += "・Reaja com ❌ para sair do evento.\n"
 
 	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("%s - %s%s", getEventName(event.Type), event.Title, role),
+		Title:       fmt.Sprintf("%s - %s", getEventName(event.Type), event.Title),
 		Description: desc,
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: footer,
