@@ -36,6 +36,7 @@ const (
 type Event struct {
 	ID          primitive.ObjectID `bson:"_id" json:"id"`
 	Title       string             `bson:"title" json:"title"`
+	Description string             `bson:"description" json:"description"`
 	Type        EventType          `bson:"type" json:"type"`
 	Owner       string             `bson:"owner" json:"owner"`
 	CreatedAt   *time.Time         `bson:"created_at,omitempty" json:"created_at"`

@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"nwmanager/discordbot/helpers"
 	"nwmanager/types"
 	"os"
 	"time"
@@ -25,9 +26,12 @@ func init() {
 
 const (
 	EVENTS_CHANNEL_NAME         = "🟢・eventos"
-	EVENTS_CHANNEL_INIT_MESSAGE = "Envie **/evento** para iniciar um evento.\nPara encerrar um evento criado digite **/encerrar**."
+	EVENTS_CHANNEL_INIT_MESSAGE = "Envie **/evento** para iniciar um evento.\nPara encerrar um evento criado digite **/encerrar**.\n\n**:arrow_forward: EVENTOS ABERTOS**"
 
 	MEMBER_ROLE_NAME = "👥・Membro"
+	OPR_ROLE_NAME    = "⚔️・OPR"
+	RAID_DEVOUR_ROLE = "🪱・Devorador"
+	RAID_GORGON_ROLE = "🗿・Gorgonas"
 )
 
 var (
@@ -65,8 +69,8 @@ const (
 	EventTypeEmojiDungeonM3     = "3️⃣"
 	EventTypeEmojiRaidGorgon    = "🐍"
 	EventTypeEmojiRaidDevour    = "🦑"
-	EventTypeEmojiOPR           = "🏹"
-	EventTypeEmojiArena         = "⚔️"
+	EventTypeEmojiOPR           = "⚔️"
+	EventTypeEmojiArena         = "🏹"
 )
 
 // Event slots
@@ -79,6 +83,15 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeOPR:        "THDDD",
 	types.EventTypeArena:      "AAA",
 }
+
+// Event roles
+var EventRoles = map[types.EventType]string{
+	types.EventTypeOPR:        OPR_ROLE_NAME,
+	types.EventTypeRaidDevour: RAID_DEVOUR_ROLE,
+	types.EventTypeRaidGorgon: RAID_GORGON_ROLE,
+}
+
+var EventRoleIDs = map[types.EventType]string{}
 
 var EventTypeEmojis = map[types.EventType]string{
 	types.EventTypeDungeonNormal: EventTypeEmojiDungeonNormal,
@@ -302,4 +315,16 @@ func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int
 	}
 
 	return freeSlots
+}
+
+func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
+	if roleName, ok := EventRoles[event.Type]; ok {
+		role := helpers.GetRoleByName(guild, roleName)
+		if role == nil {
+			return ""
+		}
+		return role.ID
+	}
+
+	return ""
 }

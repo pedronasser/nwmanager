@@ -29,6 +29,14 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		log.Fatalf("Cannot get %s role", MEMBER_ROLE_NAME)
 	}
 
+	for t, roleName := range EventRoles {
+		role := GetRoleByName(guild, roleName)
+		if role == nil {
+			log.Fatalf("Cannot get %s role", roleName)
+		}
+		EventRoles[t] = role.ID
+	}
+
 	_ = setupEventsChannel(ctx, dg, db, everyoneRole, memberRole)
 
 	_, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
@@ -68,17 +76,17 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 					log.Fatalf("Cannot decode event: %v", err)
 				}
 
-				if event.Status == types.EventStatusCompleted && event.CompletedAt.Add(EVENT_COMPLETE_EXPIRE_DURATION).Before(time.Now()) {
-					removeEvent(ctx, db, dg, &event)
-					fmt.Println("Event removed", event.ID)
-					continue
-				}
+				// if event.Status == types.EventStatusCompleted && event.CompletedAt.Add(EVENT_COMPLETE_EXPIRE_DURATION).Before(time.Now()) {
+				// 	removeEvent(ctx, db, dg, &event)
+				// 	fmt.Println("Event removed", event.ID)
+				// 	continue
+				// }
 
-				if event.Status == types.EventStatusOpen && event.CreatedAt.Add(EVENT_MAX_DURATION).Before(time.Now()) {
-					removeEvent(ctx, db, dg, &event)
-					fmt.Println("Event removed", event.ID)
-					continue
-				}
+				// if event.Status == types.EventStatusOpen && event.CreatedAt.Add(EVENT_MAX_DURATION).Before(time.Now()) {
+				// 	removeEvent(ctx, db, dg, &event)
+				// 	fmt.Println("Event removed", event.ID)
+				// 	continue
+				// }
 			}
 		}
 	}()
@@ -88,7 +96,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	"/evento": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
-			SendInteractiveMessage(s, i, "evento:already", "Você já possui um evento em andamento.")
+			ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
 			return
 		}
 
@@ -112,7 +120,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		ctx := context.Background()
 		res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"owner": i.Member.User.ID, "status": types.EventStatusOpen})
 		if res.Err() != nil {
-			SendInteractiveMessage(s, i, "evento:already", "Você não possui um evento em andamento.")
+			ReplyEphemeralMessage(s, i, "Você não possui um evento em andamento.", 5*time.Second)
 			return
 		}
 
@@ -124,15 +132,58 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 
 		removeEvent(ctx, db, s, &event)
 
-		SendInteractiveMessage(s, i, "evento:close", "**EVENTO ENCERRADO.**")
+		ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
 	},
 
 	"msg:evento:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
 		data := i.MessageComponentData()
-		tipo := data.Values[0]
-		createEvent(s, i, db, tipo)
+		tipo := types.EventType(data.Values[0])
+		EventData[i.Member.User.ID] = &types.Event{
+			Owner: i.Member.User.ID,
+			Type:  tipo,
+		}
+		SendModal(s, i, "create", "Criação de evento",
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "title",
+						Label:       "Título do evento",
+						Placeholder: "Exemplo: Gorgonas às 17h30",
+						Style:       discordgo.TextInputShort,
+						Required:    true,
+						MaxLength:   50,
+					},
+				},
+			},
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "description",
+						Label:       "Descrição/requisitos do evento",
+						Placeholder: "Exemplo: GS 695+",
+						Style:       discordgo.TextInputParagraph,
+						Required:    false,
+					},
+				},
+			},
+		)
+
+		s.InteractionResponseDelete(i.Interaction)
+	},
+
+	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+		fmt.Println("modal:create", EventData)
+		data := i.ModalSubmitData()
+		if v, ok := EventData[i.Member.User.ID]; ok {
+			title := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			description := data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			createEvent(s, i, db, v.Type, title, description)
+		}
+		delete(EventData, i.Member.User.ID)
 	},
 }
+
+var EventData = map[string]*types.Event{}
 
 func HandleMessages(s *discordgo.Session, db types.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
@@ -234,16 +285,18 @@ func updateEventMessage(s *discordgo.Session, event *types.Event) {
 		log.Fatalf("Cannot get message: %v", err)
 	}
 
-	_, err = s.ChannelMessageEdit(events_channel.ID, message.ID, buildEventMessage(event))
+	_, err = s.ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(event))
 	if err != nil {
 		log.Fatalf("Cannot edit message: %v", err)
 	}
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo string) {
+func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo types.EventType, title, description string) {
 	event := types.Event{
 		ID:          primitive.NewObjectID(),
-		Type:        types.EventType(tipo),
+		Title:       title,
+		Description: description,
+		Type:        tipo,
 		Owner:       i.Interaction.Member.User.ID,
 		Status:      types.EventStatusOpen,
 		CreatedAt:   Some(time.Now()),
@@ -268,7 +321,7 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.
 		log.Fatalf("Cannot insert event: %v", err)
 	}
 
-	SendInteractiveMessage(s, i, "evento:confirm", fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", EVENTS_CHANNEL_ID))
+	ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", EVENTS_CHANNEL_ID), 5*time.Second)
 }
 
 func setupEventsChannel(
@@ -349,29 +402,56 @@ func setupEventsChannel(
 	return events_channel
 }
 
-func buildEventMessage(event *types.Event) string {
-	msg := fmt.Sprintf("**%s**\nOrganizador: <@%s>\n\n**Vagas:**\n", getEventName(event.Type), event.Owner)
+func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
+	desc := ""
+
+	if event.Description != "" {
+		desc += "\n```"
+		desc += fmt.Sprintf("\n%s\n", event.Description)
+		desc += "```\n"
+	}
+
 	for i, player := range event.PlayerSlots {
 		role := getEventRoleNameByPosition(event.Type, i)
 		playerName := "_[ABERTO]_"
 		if player != "" {
 			playerName = fmt.Sprintf("<@%s>", player)
 		}
-		msg += fmt.Sprintf("%s・%s\n", role, playerName)
+		desc += fmt.Sprintf("%s・%s\n", role, playerName)
 		if (i+1)%5 == 0 {
-			msg += "\n"
+			desc += "\n"
 		}
 	}
-	msg += "・Reaja com 🛡️ para participar como **TANK**.\n"
-	msg += "・Reaja com 🌿 para participar como **HEALER**.\n"
-	msg += "・Reaja com ⚔️ para participar como **DPS**.\n"
-	msg += "・Reaja com ❌ para sair do evento.\n"
 
-	return msg
+	footer := "・Reaja com 🛡️ para participar como TANK.\n"
+	footer += "・Reaja com 🌿 para participar como HEALER.\n"
+	footer += "・Reaja com ⚔️ para participar como DPS.\n"
+	footer += "・Reaja com ❌ para sair do evento.\n"
+
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%s - %s%s", getEventName(event.Type), event.Title, role),
+		Description: desc,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: footer,
+		},
+		Color: 0x00ff00,
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: "https://dqzvgunkova5o.cloudfront.net/statics/2024-10-31/images/NWA_logo.png",
+		},
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Organizador",
+				Value:  fmt.Sprintf("<@%s>", event.Owner),
+				Inline: true,
+			},
+		},
+	}
+
+	return embed
 }
 
 func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) *discordgo.Message {
-	message, err := dg.ChannelMessageSend(events_channel.ID, buildEventMessage(event))
+	message, err := dg.ChannelMessageSendEmbed(events_channel.ID, buildEventMessage(event))
 	if err != nil {
 		log.Fatalf("Cannot send event message: %v", err)
 	}

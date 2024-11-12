@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nwmanager/types"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -89,12 +90,39 @@ func MentionUser(user *discordgo.User) string {
 	return fmt.Sprintf("<@%s>", user.ID)
 }
 
+var knownRoles = map[string]discordgo.Role{}
+
 func GetRoleByName(guild *discordgo.Guild, roleName string) *discordgo.Role {
+	if role, ok := knownRoles[roleName]; ok {
+		return &role
+	}
 	for _, role := range guild.Roles {
 		if role.Name == roleName {
+			knownRoles[roleName] = *role
 			return role
 		}
 	}
 
 	return nil
+}
+
+func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string, destroyDelay time.Duration) {
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf(":robot:\n\n%s", content),
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	time.Sleep(destroyDelay)
+
+	err = s.InteractionResponseDelete(i.Interaction)
+	if err != nil {
+		panic(err)
+	}
 }
