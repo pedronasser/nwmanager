@@ -26,7 +26,7 @@ func init() {
 
 const (
 	EVENTS_CHANNEL_NAME         = "🟢・eventos"
-	EVENTS_CHANNEL_INIT_MESSAGE = "Envie **/evento** para iniciar um evento.\nPara encerrar um evento criado digite **/encerrar**.\n\n**:arrow_forward: EVENTOS ABERTOS**"
+	EVENTS_CHANNEL_INIT_MESSAGE = "**Clique no botão abaixo para criar um evento.\n**Para encerrar um evento, clique no botão de encerrar."
 
 	MEMBER_ROLE_NAME = "👥・Membro"
 	OPR_ROLE_NAME    = "⚔️・OPR"
@@ -36,7 +36,7 @@ const (
 
 var (
 	EVENT_CLEANUP_INTERVAL         time.Duration = 30 * time.Second
-	EVENT_COMPLETE_EXPIRE_DURATION time.Duration = 5 * time.Minute
+	EVENT_COMPLETE_EXPIRE_DURATION time.Duration = 15 * time.Minute
 	EVENT_MAX_DURATION             time.Duration = 60 * time.Minute
 )
 
@@ -49,6 +49,8 @@ const (
 	EventNameRaidDevour    = "Raid Devorador"
 	EventNameOPR           = "Outpost Rush (OPR)"
 	EventNameArena         = "Arena"
+	EventNameInfluenceRace = "Corrida de Influência"
+	EventNameWar           = "Guerra"
 )
 
 const (
@@ -60,6 +62,8 @@ const (
 	EventTypeSlotsRaidDevour    = 20
 	EventTypeSlotsOPR           = 5
 	EventTypeSlotsArena         = 3
+	EventTypeSlotsInfluenceRace = -1
+	EventTypeSlotsWar           = -1
 )
 
 const (
@@ -67,21 +71,25 @@ const (
 	EventTypeEmojiDungeonM1     = "1️⃣"
 	EventTypeEmojiDungeonM2     = "2️⃣"
 	EventTypeEmojiDungeonM3     = "3️⃣"
-	EventTypeEmojiRaidGorgon    = "🐍"
-	EventTypeEmojiRaidDevour    = "🦑"
+	EventTypeEmojiRaidGorgon    = "🗿"
+	EventTypeEmojiRaidDevour    = "🪱"
 	EventTypeEmojiOPR           = "⚔️"
 	EventTypeEmojiArena         = "🏹"
+	EventTypeEmojiInfluenceRace = "🏁"
+	EventTypeEmojiWar           = "⚔️"
 )
 
 // Event slots
 var EventSlots = map[types.EventType]string{
-	types.EventTypeDungeonM1:  "THDDD",
-	types.EventTypeDungeonM2:  "THDDD",
-	types.EventTypeDungeonM3:  "THDDD",
-	types.EventTypeRaidGorgon: "THDDD HDDDD",
-	types.EventTypeRaidDevour: "THDDD HDDDD DDDDD DDDDD",
-	types.EventTypeOPR:        "THDDD",
-	types.EventTypeArena:      "AAA",
+	types.EventTypeDungeonM1:     "THDDD",
+	types.EventTypeDungeonM2:     "THDDD",
+	types.EventTypeDungeonM3:     "THDDD",
+	types.EventTypeRaidGorgon:    "THDDD HDDDD",
+	types.EventTypeRaidDevour:    "THDDD HDDDD DDDDD DDDDD",
+	types.EventTypeOPR:           "THDDD",
+	types.EventTypeArena:         "AAA",
+	types.EventTypeInfluenceRace: "",
+	types.EventTypeWar:           "",
 }
 
 // Event roles
@@ -102,6 +110,7 @@ var EventTypeEmojis = map[types.EventType]string{
 	types.EventTypeRaidDevour:    EventTypeEmojiRaidDevour,
 	types.EventTypeOPR:           EventTypeEmojiOPR,
 	types.EventTypeArena:         EventTypeEmojiArena,
+	types.EventTypeInfluenceRace: EventTypeEmojiInfluenceRace,
 }
 
 var (
@@ -162,6 +171,20 @@ var (
 				Name: EventTypeEmojiArena,
 			},
 		},
+		{
+			Label: fmt.Sprintf("%s", EventNameInfluenceRace),
+			Value: string(types.EventTypeInfluenceRace),
+			Emoji: &discordgo.ComponentEmoji{
+				Name: EventTypeEmojiInfluenceRace,
+			},
+		},
+		{
+			Label: fmt.Sprintf("%s", EventNameWar),
+			Value: string(types.EventTypeWar),
+			Emoji: &discordgo.ComponentEmoji{
+				Name: EventTypeEmojiWar,
+			},
+		},
 	}
 )
 
@@ -183,6 +206,10 @@ func getEventName(eventType types.EventType) string {
 		return EventTypeEmojiOPR + " " + EventNameOPR
 	case types.EventTypeArena:
 		return EventTypeEmojiArena + " " + EventNameArena
+	case types.EventTypeInfluenceRace:
+		return EventTypeEmojiInfluenceRace + " " + EventNameInfluenceRace
+	case types.EventTypeWar:
+		return EventTypeEmojiWar + " " + EventNameWar
 	}
 
 	return ""

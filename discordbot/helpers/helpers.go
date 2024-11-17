@@ -38,8 +38,12 @@ func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate
 	}
 }
 
-func CreateHandler(handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func CreateHandler(guildID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.GuildID != guildID {
+			return
+		}
+
 		// d, _ := json.MarshalIndent(i, "", "\t")
 		// fmt.Println(string(d))
 		switch i.Type {
@@ -56,7 +60,6 @@ func CreateHandler(handlers map[string]func(s *discordgo.Session, i *discordgo.I
 				}
 			}
 		case discordgo.InteractionMessageComponent:
-			fmt.Println("msg:" + i.MessageComponentData().CustomID)
 			if h, ok := handlers["msg:"+i.MessageComponentData().CustomID]; ok {
 				h(s, i, db)
 				return
