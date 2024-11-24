@@ -242,6 +242,7 @@ func HandleEventClose(GuildID string, s *discordgo.Session, db types.Database) f
 			return
 		}
 		if i.Type == discordgo.InteractionMessageComponent {
+			fmt.Println("msg", i.MessageComponentData().CustomID)
 			if strings.HasPrefix(i.MessageComponentData().CustomID, "close_event_") {
 				handleEventClose(s, i, db)
 				return
@@ -253,8 +254,9 @@ func HandleEventClose(GuildID string, s *discordgo.Session, db types.Database) f
 				return
 			}
 		} else if i.Type == discordgo.InteractionModalSubmit {
-			if strings.HasPrefix(i.ModalSubmitData().CustomID, "modal:edit_") {
-				id := strings.TrimPrefix(i.ModalSubmitData().CustomID, "modal:edit_")
+			fmt.Println("modal", i.ModalSubmitData().CustomID)
+			if strings.HasPrefix(i.ModalSubmitData().CustomID, "edit_") {
+				id := strings.TrimPrefix(i.ModalSubmitData().CustomID, "edit_")
 				handleEventEdit(s, i, db, id)
 				return
 			}
@@ -369,6 +371,8 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	title := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 	description := data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 
+	event.Title = title
+	event.Description = description
 	_, err = db.Collection(types.EventsCollection).UpdateOne(ctx,
 		bson.M{"_id": oid},
 		bson.M{"$set": bson.M{"title": title, "description": description}},

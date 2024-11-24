@@ -104,11 +104,11 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 							Style:    discordgo.PrimaryButton,
 							CustomID: fmt.Sprintf("edit_%s", event.ID.Hex()),
 						},
-						discordgo.Button{
-							Label:    "Remover Participante",
-							Style:    discordgo.SecondaryButton,
-							CustomID: fmt.Sprintf("uninvite_%s", event.ID.Hex()),
-						},
+						// discordgo.Button{
+						// 	Label:    "Remover Participante",
+						// 	Style:    discordgo.SecondaryButton,
+						// 	CustomID: fmt.Sprintf("uninvite_%s", event.ID.Hex()),
+						// },
 						discordgo.Button{
 							Label:    "Encerrar",
 							Style:    discordgo.DangerButton,
