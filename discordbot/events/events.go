@@ -38,6 +38,24 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 	// 	EventRoles[t] = role.ID
 	// }
 
+	adminRole := GetRoleByName(guild, ADMIN_ROLE_NAME)
+	fmt.Println(adminRole)
+	if adminRole != nil {
+		ADMIN_ROLE_ID = adminRole.ID
+	}
+
+	consulRole := GetRoleByName(guild, CONSUL_ROLE_NAME)
+	fmt.Println(consulRole)
+	if consulRole != nil {
+		CONSUL_ROLE_ID = consulRole.ID
+	}
+
+	officerRole := GetRoleByName(guild, OFFICER_ROLE_NAME)
+	fmt.Println(officerRole)
+	if officerRole != nil {
+		OFFICER_ROLE_ID = officerRole.ID
+	}
+
 	_ = setupEventsChannel(ctx, dg, db, everyoneRole, memberRole)
 
 	_, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
@@ -283,7 +301,8 @@ func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 		log.Fatalf("Cannot decode event: %v", err)
 	}
 
-	if event.Owner != i.Member.User.ID {
+	fmt.Println(isMemberAdmin(i.Member))
+	if event.Owner != i.Member.User.ID && !isMemberAdmin(i.Member) {
 		ReplyEphemeralMessage(s, i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}

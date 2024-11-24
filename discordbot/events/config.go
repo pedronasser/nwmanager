@@ -28,10 +28,19 @@ const (
 	EVENTS_CHANNEL_NAME         = "🟢・eventos"
 	EVENTS_CHANNEL_INIT_MESSAGE = "**Clique no botão abaixo para criar um evento.\n**Para encerrar um evento, clique no botão de encerrar."
 
-	MEMBER_ROLE_NAME = "👥・Membro"
-	OPR_ROLE_NAME    = "⚔️・OPR"
-	RAID_DEVOUR_ROLE = "🪱・Devorador"
-	RAID_GORGON_ROLE = "🗿・Gorgonas"
+	MEMBER_ROLE_NAME  = "👥・Membro"
+	ADMIN_ROLE_NAME   = "👑 Governador"
+	CONSUL_ROLE_NAME  = "💎Consul"
+	OFFICER_ROLE_NAME = "🏆Oficial"
+	OPR_ROLE_NAME     = "⚔️・OPR"
+	RAID_DEVOUR_ROLE  = "🪱・Devorador"
+	RAID_GORGON_ROLE  = "🗿・Gorgonas"
+)
+
+var (
+	ADMIN_ROLE_ID   = ""
+	CONSUL_ROLE_ID  = ""
+	OFFICER_ROLE_ID = ""
 )
 
 var (
@@ -354,4 +363,20 @@ func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
 	}
 
 	return ""
+}
+
+func isMemberAdmin(member *discordgo.Member) bool {
+	for _, role := range member.Roles {
+		if ADMIN_ROLE_ID != "" && role == ADMIN_ROLE_ID {
+			return true
+		}
+		if CONSUL_ROLE_ID != "" && role == CONSUL_ROLE_ID {
+			return true
+		}
+		if OFFICER_ROLE_ID != "" && role == OFFICER_ROLE_ID {
+			return true
+		}
+	}
+
+	return false
 }
