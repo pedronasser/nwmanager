@@ -7,7 +7,6 @@ import (
 	"nwmanager/types"
 	"time"
 
-	. "nwmanager/discordbot/helpers"
 	. "nwmanager/helpers"
 
 	"github.com/bwmarrin/discordgo"
@@ -57,7 +56,7 @@ func updateEventMessage(s *discordgo.Session, event *types.Event) {
 	}
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo types.EventType, title, description string) {
+func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo types.EventType, title, description string, scheduledAt *time.Time) {
 	event := types.Event{
 		ID:          primitive.NewObjectID(),
 		Title:       title,
@@ -67,6 +66,7 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.
 		Status:      types.EventStatusOpen,
 		CreatedAt:   Some(time.Now()),
 		PlayerSlots: []string{},
+		ScheduledAt: scheduledAt,
 	}
 
 	if EventSlots[event.Type] != "" {
@@ -88,8 +88,6 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.
 	if err != nil {
 		log.Fatalf("Cannot insert event: %v", err)
 	}
-
-	ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", EVENTS_CHANNEL_ID), 5*time.Second)
 }
 
 func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) *discordgo.Message {

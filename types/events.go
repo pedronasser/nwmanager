@@ -25,6 +25,8 @@ const (
 
 	EventTypeInfluenceRace EventType = "InfluenceRace"
 	EventTypeWar           EventType = "War"
+
+	EventTypeLootRoute EventType = "LootRoute"
 )
 
 // Event status

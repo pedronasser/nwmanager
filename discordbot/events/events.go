@@ -201,7 +201,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 					discordgo.TextInput{
 						CustomID:    "title",
 						Label:       "Título do evento",
-						Placeholder: "Exemplo: Gorgonas às 17h30",
+						Placeholder: "Exemplo: Gorgonas dos CLT",
 						Style:       discordgo.TextInputShort,
 						Required:    true,
 						MaxLength:   50,
@@ -213,8 +213,34 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 					discordgo.TextInput{
 						CustomID:    "description",
 						Label:       "Descrição/requisitos do evento",
-						Placeholder: "Exemplo: GS 695+",
+						Placeholder: "Exemplo: GS 700+",
 						Style:       discordgo.TextInputParagraph,
+						Required:    false,
+					},
+				},
+			},
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "date",
+						Label:       "Dia do Evento (formato: DD/MM/AAAA)",
+						Placeholder: "Exemplo: 25/11/2024 (deixe vazio se não for agendado)",
+						Style:       discordgo.TextInputShort,
+						MinLength:   10,
+						MaxLength:   10,
+						Required:    false,
+					},
+				},
+			},
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "hour",
+						Label:       "Horário do Evento (formato: HH:mm)",
+						Placeholder: "Exemplo: 16:59 (deixe vazio se não for agendado)",
+						Style:       discordgo.TextInputShort,
+						MinLength:   5,
+						MaxLength:   5,
 						Required:    false,
 					},
 				},
@@ -230,7 +256,19 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		if v, ok := EventData[i.Member.User.ID]; ok {
 			title := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			description := data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-			createEvent(s, i, db, v.Type, title, description)
+			date := data.Components[2].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			hour := data.Components[3].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+			var scheduledAt *time.Time
+			if date != "" || hour != "" {
+				d, err := time.Parse("02/01/2006 15:04", date+" "+hour)
+				if err != nil {
+					ReplyEphemeralMessage(s, i, "A data/hora digitada está inválida.", 5*time.Second)
+					return
+				}
+				scheduledAt = &d
+			}
+			go createEvent(s, i, db, v.Type, title, description, scheduledAt)
+			ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", EVENTS_CHANNEL_ID), 5*time.Second)
 		}
 		delete(EventData, i.Member.User.ID)
 	},
@@ -357,6 +395,32 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 					Style:       discordgo.TextInputParagraph,
 					Required:    false,
 					Value:       event.Description,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "date",
+					Label:       "Dia do Evento (formato: DD/MM/AAAA)",
+					Placeholder: "Exemplo: 25/11/2024 (deixe vazio se não for agendado)",
+					Style:       discordgo.TextInputShort,
+					MinLength:   10,
+					MaxLength:   10,
+					Required:    false,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "hour",
+					Label:       "Horário do Evento (formato: HH:mm)",
+					Placeholder: "Exemplo: 16:59 (deixe vazio se não for agendado)",
+					Style:       discordgo.TextInputShort,
+					MinLength:   5,
+					MaxLength:   5,
+					Required:    false,
 				},
 			},
 		},
@@ -601,8 +665,13 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 	footer += "・Reaja com ⚔️ para participar como DPS.\n"
 	footer += "・Reaja com ❌ para sair do evento.\n"
 
+	scheduled := ""
+	if event.ScheduledAt != nil {
+		scheduled = fmt.Sprintf(" (%s)", (*event.ScheduledAt).Format("02/01/2006 às 15:04"))
+	}
+
 	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("%s - %s", getEventName(event.Type), event.Title),
+		Title:       fmt.Sprintf("%s - %s%s", getEventName(event.Type), event.Title, scheduled),
 		Description: desc,
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: footer,
