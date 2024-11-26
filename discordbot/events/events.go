@@ -259,7 +259,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			date := data.Components[2].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			hour := data.Components[3].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 			var scheduledAt *time.Time
-			if date != "" || hour != "" {
+			if date != "" && hour != "" {
 				d, err := time.Parse("02/01/2006 15:04", date+" "+hour)
 				if err != nil {
 					ReplyEphemeralMessage(s, i, "A data/hora digitada está inválida.", 5*time.Second)
