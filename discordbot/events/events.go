@@ -339,13 +339,12 @@ func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 		log.Fatalf("Cannot decode event: %v", err)
 	}
 
-	fmt.Println(isMemberAdmin(i.Member))
 	if event.Owner != i.Member.User.ID && !isMemberAdmin(i.Member) {
 		ReplyEphemeralMessage(s, i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}
 
-	removeEvent(ctx, db, s, &event)
+	closeEvent(ctx, db, s, &event)
 	ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
 }
 
