@@ -2,10 +2,10 @@ package events
 
 import (
 	"fmt"
-	"nwmanager/discordbot/helpers"
+	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"os"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -27,26 +27,6 @@ func init() {
 const (
 	EVENTS_CHANNEL_NAME         = "🟢・eventos"
 	EVENTS_CHANNEL_INIT_MESSAGE = "**Clique no botão abaixo** ou **envie /evento** para criar um evento.\n\nPara encerrar um evento, **clique no botão de encerrar**x."
-
-	MEMBER_ROLE_NAME  = "👥・Membro"
-	ADMIN_ROLE_NAME   = "👑 Governador"
-	CONSUL_ROLE_NAME  = "💎Consul"
-	OFFICER_ROLE_NAME = "🏆Oficial"
-	OPR_ROLE_NAME     = "⚔️・OPR"
-	RAID_DEVOUR_ROLE  = "🪱・Devorador"
-	RAID_GORGON_ROLE  = "🗿・Gorgonas"
-)
-
-var (
-	ADMIN_ROLE_ID   = ""
-	CONSUL_ROLE_ID  = ""
-	OFFICER_ROLE_ID = ""
-)
-
-var (
-	EVENT_CLEANUP_INTERVAL         time.Duration = 30 * time.Second
-	EVENT_COMPLETE_EXPIRE_DURATION time.Duration = 15 * time.Minute
-	EVENT_MAX_DURATION             time.Duration = 60 * time.Minute
 )
 
 const (
@@ -107,9 +87,9 @@ var EventSlots = map[types.EventType]string{
 
 // Event roles
 var EventRoles = map[types.EventType]string{
-	types.EventTypeOPR:        OPR_ROLE_NAME,
-	types.EventTypeRaidDevour: RAID_DEVOUR_ROLE,
-	types.EventTypeRaidGorgon: RAID_GORGON_ROLE,
+	types.EventTypeOPR:        globals.OPR_ROLE_NAME,
+	types.EventTypeRaidDevour: globals.RAID_DEVOUR_ROLE,
+	types.EventTypeRaidGorgon: globals.RAID_GORGON_ROLE,
 }
 
 var EventRoleIDs = map[types.EventType]string{}
@@ -369,7 +349,7 @@ func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int
 
 func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
 	if roleName, ok := EventRoles[event.Type]; ok {
-		role := helpers.GetRoleByName(guild, roleName)
+		role := discordutils.GetRoleByName(guild, roleName)
 		if role == nil {
 			return ""
 		}
@@ -377,20 +357,4 @@ func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
 	}
 
 	return ""
-}
-
-func isMemberAdmin(member *discordgo.Member) bool {
-	for _, role := range member.Roles {
-		if ADMIN_ROLE_ID != "" && role == ADMIN_ROLE_ID {
-			return true
-		}
-		if CONSUL_ROLE_ID != "" && role == CONSUL_ROLE_ID {
-			return true
-		}
-		if OFFICER_ROLE_ID != "" && role == OFFICER_ROLE_ID {
-			return true
-		}
-	}
-
-	return false
 }

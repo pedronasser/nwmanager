@@ -49,6 +49,7 @@ type Event struct {
 	ScheduledAt *time.Time         `bson:"scheduled_at,omitempty" json:"scheduled_at"`
 	CompletedAt *time.Time         `bson:"completed_at,omitempty" json:"completed_at"`
 	ClosedAt    *time.Time         `bson:"closed_at,omitempty" json:"closed_at"`
+	NotifiedAt  *time.Time         `bson:"notified_at,omitempty" json:"notified_at"`
 	PlayerSlots []string           `bson:"player_slots" json:"player_slots"`
 	Status      EventStatus        `bson:"status" json:"status"`
 	MessageID   string             `bson:"message_id" json:"message_id"`

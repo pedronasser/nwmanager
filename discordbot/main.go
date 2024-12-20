@@ -5,6 +5,9 @@ import (
 	"log"
 	"nwmanager/database"
 	"nwmanager/discordbot/events"
+	"nwmanager/discordbot/globals"
+	"nwmanager/discordbot/management"
+	"nwmanager/discordbot/war"
 	"os"
 	"os/signal"
 	"syscall"
@@ -55,8 +58,11 @@ func main() {
 		log.Fatalf("failed to create database: %v", err)
 	}
 
+	globals.Setup(ctx, dg, &AppID, &GuildID, db)
 	// register.Setup(dg, &AppID, &GuildID, db)
 	events.Setup(ctx, dg, &AppID, &GuildID, db)
+	war.Setup(ctx, dg, &AppID, &GuildID, db)
+	management.Setup(ctx, dg, &AppID, &GuildID, db)
 
 	// Just like the ping pong example, we only care about receiving message
 	// events in this example.

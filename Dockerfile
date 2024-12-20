@@ -12,6 +12,8 @@ RUN go build -v -o /app ./discordbot/
 
 FROM debian:bookworm
 
+ENV TZ=America/Sao_Paulo
+
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app /usr/local/bin/
 CMD ["app"]

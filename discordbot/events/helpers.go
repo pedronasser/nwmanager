@@ -14,6 +14,64 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
+	desc := ""
+
+	if event.Description != "" {
+		desc += "\n```"
+		desc += fmt.Sprintf("\n%s\n", event.Description)
+		desc += "```\n"
+	}
+
+	for i, player := range event.PlayerSlots {
+		if EventSlots[event.Type] != "" {
+			role := getEventRoleNameByPosition(event.Type, i)
+			playerName := "_[ABERTO]_"
+			if player != "" {
+				playerName = fmt.Sprintf("<@%s>", player)
+			}
+			desc += fmt.Sprintf("%s・%s\n", role, playerName)
+		} else {
+			desc += fmt.Sprintf("・<@%s>\n", player)
+		}
+
+		if (i+1)%5 == 0 {
+			desc += "\n"
+		}
+	}
+
+	footer := "・Reaja com 🛡️ para participar como TANK.\n"
+	footer += "・Reaja com 🌿 para participar como HEALER.\n"
+	footer += "・Reaja com ⚔️ para participar como DPS.\n"
+	footer += "・Reaja com ❌ para sair do evento.\n"
+
+	scheduled := ""
+	if event.ScheduledAt != nil {
+		scheduled = fmt.Sprintf(" (%s)", (*event.ScheduledAt).Format("02/01/2006 às 15:04"))
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%s - %s%s", getEventName(event.Type), event.Title, scheduled),
+		Description: desc,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: footer,
+		},
+		Color: 0x00ff00,
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: "https://dqzvgunkova5o.cloudfront.net/statics/2024-10-31/images/NWA_logo.png",
+		},
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Organizador",
+				Value:  fmt.Sprintf("<@%s>", event.Owner),
+				Inline: true,
+			},
+		},
+	}
+
+	return embed
+}
+
 func removePlayerFromEvent(u *discordgo.User, db types.Database, event *types.Event) {
 	foundIndex := -1
 	for i, slot := range event.PlayerSlots {
@@ -172,7 +230,7 @@ func closeEvent(ctx context.Context, db types.Database, s *discordgo.Session, ev
 }
 
 func ownerHasEvent(ctx context.Context, db types.Database, owner *discordgo.User) bool {
-	res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"owner": owner.ID})
+	res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"owner": owner.ID, "status": types.EventStatusOpen})
 	if res.Err() != nil {
 		return false
 	}

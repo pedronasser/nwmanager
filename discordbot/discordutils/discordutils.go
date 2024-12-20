@@ -1,7 +1,8 @@
-package helpers
+package discordutils
 
 import (
 	"fmt"
+	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"strings"
 	"time"
@@ -38,9 +39,9 @@ func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate
 	}
 }
 
-func CreateHandler(guildID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func CreateHandler(guildID string, channelID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if i.GuildID != guildID {
+		if i.GuildID != guildID || i.ChannelID != channelID {
 			return
 		}
 
@@ -128,4 +129,74 @@ func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate,
 	if err != nil {
 		panic(err)
 	}
+}
+
+func SendMemberDM(s *discordgo.Session, userID string, content string) error {
+	channel, err := s.UserChannelCreate(userID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.ChannelMessageSend(channel.ID, content)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetGuildMembers(s *discordgo.Session, guildID string, memberRoleID string) ([]*discordgo.Member, error) {
+	members := []*discordgo.Member{}
+	after := ""
+	for {
+		chunk, err := s.GuildMembers(guildID, after, 1000)
+		if err != nil {
+			return nil, err
+		}
+
+		actualMembers := []*discordgo.Member{}
+		for _, member := range chunk {
+			for _, role := range member.Roles {
+				if role == memberRoleID {
+					actualMembers = append(actualMembers, member)
+					break
+				}
+			}
+		}
+
+		members = append(members, actualMembers...)
+		if len(chunk) < 1000 {
+			break
+		}
+
+		after = chunk[len(chunk)-1].User.ID
+	}
+
+	return members, nil
+}
+
+func GetMemberName(member *discordgo.Member) string {
+	if member.Nick != "" {
+		return member.Nick
+	}
+	if member.User.GlobalName != "" {
+		return member.User.GlobalName
+	}
+	return member.User.Username
+}
+
+func IsMemberAdmin(member *discordgo.Member) bool {
+	for _, role := range member.Roles {
+		if globals.ACCESS_ROLE_IDS[globals.ADMIN_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.ADMIN_ROLE_NAME] {
+			return true
+		}
+		if globals.ACCESS_ROLE_IDS[globals.CONSUL_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.CONSUL_ROLE_NAME] {
+			return true
+		}
+		if globals.ACCESS_ROLE_IDS[globals.OFFICER_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.OFFICER_ROLE_NAME] {
+			return true
+		}
+	}
+
+	return false
 }

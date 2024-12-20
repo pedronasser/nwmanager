@@ -2,14 +2,8 @@ package helpers
 
 import (
 	"errors"
-	"fmt"
 	"time"
 )
-
-func main() {
-	dur, _ := ParseDuration("1.000000001s")
-	fmt.Println(dur)
-}
 
 var unitMap = map[string]int64{
 	"ns": int64(time.Nanosecond),
