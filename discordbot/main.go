@@ -8,6 +8,7 @@ import (
 	"nwmanager/discordbot/globals"
 	"nwmanager/discordbot/management"
 	"nwmanager/discordbot/war"
+	"nwmanager/discordbot/web"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,6 +30,10 @@ func init() {
 
 func main() {
 	Token = os.Getenv("DISCORD_BOT_TOKEN")
+
+	ctx := context.Background()
+	os.MkdirAll("static", os.ModePerm)
+	web.Setup(ctx)
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Token)
@@ -52,7 +57,6 @@ func main() {
 		log.Fatalf("Cannot add guild to state: %v", err)
 	}
 
-	ctx := context.Background()
 	db, err := database.NewMongoDB(ctx, os.Getenv("MONGO_URI"))
 	if err != nil {
 		log.Fatalf("failed to create database: %v", err)
@@ -66,7 +70,7 @@ func main() {
 
 	// Just like the ping pong example, we only care about receiving message
 	// events in this example.
-	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions
+	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildVoiceStates
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()

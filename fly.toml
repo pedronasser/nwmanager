@@ -11,12 +11,11 @@ primary_region = 'iad'
 GO_VERSION = '1.22.5'
 
 [http_service]
+processes = ["app"]
 internal_port = 8080
-force_https = true
-auto_stop_machines = false
 auto_start_machines = true
 min_machines_running = 1
-processes = ["app"]
+force_https = false
 
 [[vm]]
 memory = '1gb'

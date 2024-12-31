@@ -67,6 +67,28 @@ var CLASS_CATEGORY_IDS = map[string]string{
 	ARCHIVE_CATEGORY:        "",
 }
 
+var BUILD_LEADER_ROLE_NAMES = map[string]string{
+	BRUISER_ROLE_NAME:       "・BL Bruiser",
+	MAGE_ROLE_NAME:          "・BL Mago",
+	ASSASSIN_ROLE_NAME:      "・BL Assassino",
+	HEALER_ROLE_NAME:        "・BL Healer",
+	DEBUFFER_ROLE_NAME:      "・BL Debuffer",
+	TANK_ROLE_NAME:          "・BL Tank",
+	DISRUPTOR_ROLE_NAME:     "・BL Disruptor",
+	ARCO_MOSQUETE_ROLE_NAME: "・BL Arco/Mosquete",
+}
+
+var CLASS_LEADER_ROLE_IDS = map[string]string{
+	BRUISER_ROLE_NAME:       "",
+	MAGE_ROLE_NAME:          "",
+	ASSASSIN_ROLE_NAME:      "",
+	HEALER_ROLE_NAME:        "",
+	DEBUFFER_ROLE_NAME:      "",
+	TANK_ROLE_NAME:          "",
+	DISRUPTOR_ROLE_NAME:     "",
+	ARCO_MOSQUETE_ROLE_NAME: "",
+}
+
 func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, db types.Database) {
 	fmt.Println("Loading globals")
 	guild, err := dg.State.Guild(*GuildID)
@@ -90,6 +112,15 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		}
 		CLASS_ROLE_IDS[roleName] = role.ID
 		fmt.Printf("Found Class Role %s: %s\n", roleName, role.ID)
+	}
+
+	for roleName := range BUILD_LEADER_ROLE_NAMES {
+		role := GetRoleByName(guild, BUILD_LEADER_ROLE_NAMES[roleName])
+		if role == nil {
+			continue
+		}
+		CLASS_LEADER_ROLE_IDS[roleName] = role.ID
+		fmt.Printf("Found Build Leader Role %s: %s\n", roleName, role.ID)
 	}
 
 	channels, err := dg.GuildChannels(*GuildID)

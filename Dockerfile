@@ -14,6 +14,8 @@ FROM debian:bookworm
 
 ENV TZ=America/Sao_Paulo
 
+EXPOSE 8080
+
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app /usr/local/bin/
 CMD ["app"]
