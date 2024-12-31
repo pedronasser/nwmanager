@@ -6,6 +6,7 @@ import (
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"os"
+	"slices"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -43,18 +44,17 @@ const (
 	EventNameLootRoute     = "Rota"
 )
 
-const (
-	EventTypeSlotsDungeonNormal = 5
-	EventTypeSlotsDungeonM1     = 5
-	EventTypeSlotsDungeonM2     = 5
-	EventTypeSlotsDungeonM3     = 5
-	EventTypeSlotsRaidGorgon    = 10
-	EventTypeSlotsRaidDevour    = 20
-	EventTypeSlotsOPR           = 5
-	EventTypeSlotsArena         = 3
-	EventTypeSlotsInfluenceRace = -1
-	EventTypeSlotsWar           = -1
-)
+var EventSlotsCount = map[types.EventType]int{
+	types.EventTypeDungeonNormal: 5,
+	types.EventTypeDungeonM1:     5,
+	types.EventTypeDungeonM2:     5,
+	types.EventTypeDungeonM3:     5,
+	types.EventTypeRaidGorgon:    10,
+	types.EventTypeRaidDevour:    20,
+	types.EventTypeOPR:           5,
+	types.EventTypeArena:         3,
+	types.EventTypeInfluenceRace: -1,
+}
 
 const (
 	EventTypeEmojiDungeonNormal = "🧌"
@@ -66,7 +66,6 @@ const (
 	EventTypeEmojiOPR           = "⚔️"
 	EventTypeEmojiArena         = "🏹"
 	EventTypeEmojiInfluenceRace = "🏁"
-	EventTypeEmojiWar           = "⚔️"
 	EventTypeEmojiLootRoute     = "💎"
 )
 
@@ -76,12 +75,11 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonM1:     "THDDD",
 	types.EventTypeDungeonM2:     "THDDD",
 	types.EventTypeDungeonM3:     "THDDD",
-	types.EventTypeRaidGorgon:    "THDDD HDDDD",
-	types.EventTypeRaidDevour:    "THDDD HDDDD DDDDD DDDDD",
+	types.EventTypeRaidGorgon:    "TH1DD HDDDD",
+	types.EventTypeRaidDevour:    "THDDD DDDDD DDDDD 22222",
 	types.EventTypeOPR:           "THDDD",
-	types.EventTypeArena:         "AAA",
+	types.EventTypeArena:         "",
 	types.EventTypeInfluenceRace: "",
-	types.EventTypeWar:           "",
 	types.EventTypeLootRoute:     "",
 }
 
@@ -117,28 +115,28 @@ var (
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidGorgon, EventTypeSlotsRaidGorgon),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidGorgon, EventSlotsCount[types.EventTypeRaidGorgon]),
 			Value: string(types.EventTypeRaidGorgon),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiRaidGorgon,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidDevour, EventTypeSlotsRaidDevour),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidDevour, EventSlotsCount[types.EventTypeRaidDevour]),
 			Value: string(types.EventTypeRaidDevour),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiRaidDevour,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameOPR, EventTypeSlotsOPR),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameOPR, EventSlotsCount[types.EventTypeOPR]),
 			Value: string(types.EventTypeOPR),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiOPR,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameArena, EventTypeSlotsArena),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameArena, EventSlotsCount[types.EventTypeArena]),
 			Value: string(types.EventTypeArena),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiArena,
@@ -152,35 +150,28 @@ var (
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s", EventNameWar),
-			Value: string(types.EventTypeWar),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiWar,
-			},
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonNormal, EventTypeSlotsDungeonNormal),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonNormal, EventSlotsCount[types.EventTypeDungeonNormal]),
 			Value: string(types.EventTypeDungeonNormal),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiDungeonNormal,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM1, EventTypeSlotsDungeonM1),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM1, EventSlotsCount[types.EventTypeDungeonM1]),
 			Value: string(types.EventTypeDungeonM1),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiDungeonM1,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM2, EventTypeSlotsDungeonM2),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM2, EventSlotsCount[types.EventTypeDungeonM2]),
 			Value: string(types.EventTypeDungeonM2),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiDungeonM2,
 			},
 		},
 		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM3, EventTypeSlotsDungeonM3),
+			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM3, EventSlotsCount[types.EventTypeDungeonM3]),
 			Value: string(types.EventTypeDungeonM3),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: EventTypeEmojiDungeonM3,
@@ -189,7 +180,7 @@ var (
 	}
 )
 
-func getEventName(eventType types.EventType) string {
+func getEventTypeName(eventType types.EventType) string {
 	switch eventType {
 	case types.EventTypeDungeonNormal:
 		return EventTypeEmojiDungeonNormal + " " + EventNameDungeonNormal
@@ -209,8 +200,6 @@ func getEventName(eventType types.EventType) string {
 		return EventTypeEmojiArena + " " + EventNameArena
 	case types.EventTypeInfluenceRace:
 		return EventTypeEmojiInfluenceRace + " " + EventNameInfluenceRace
-	case types.EventTypeWar:
-		return EventTypeEmojiWar + " " + EventNameWar
 	case types.EventTypeLootRoute:
 		return EventTypeEmojiLootRoute + " " + EventNameLootRoute
 	}
@@ -221,13 +210,35 @@ func getEventName(eventType types.EventType) string {
 type EventSlotRole rune
 
 const (
-	EventSlotTank EventSlotRole = 'T'
-	EventSlotHeal EventSlotRole = 'H'
-	EventSlotDPS  EventSlotRole = 'D'
-	EventSlotAny  EventSlotRole = 'A'
+	EventSlotTank     EventSlotRole = 'T'
+	EventSlotDPS      EventSlotRole = 'D'
+	EventSlotAny      EventSlotRole = 'A'
+	EventSlotHeal     EventSlotRole = 'H'
+	EventSlotDPSBleed EventSlotRole = '1' // Rapier Blood
+	EventSlotDPSRange EventSlotRole = '2' // Arco Pad
 )
 
+var EventSlotRoleName = map[EventSlotRole]string{
+	EventSlotTank:     "Tank",
+	EventSlotDPS:      "DPS",
+	EventSlotHeal:     "Heal",
+	EventSlotDPSBleed: "Rapier Blood",
+	EventSlotDPSRange: "Pad",
+}
+
+var EventSlotRoleEmoji = map[EventSlotRole]string{
+	EventSlotTank:     "🛡️",
+	EventSlotDPS:      "⚔️",
+	EventSlotHeal:     "🌿",
+	EventSlotDPSBleed: "🩸",
+	EventSlotDPSRange: "🏹",
+}
+
 func getEventSlotCount(eventType types.EventType) int {
+	if slots, ok := EventSlots[eventType]; ok && slots == "" {
+		return EventSlotsCount[eventType]
+	}
+
 	slots := EventSlots[eventType]
 	slotCount := 0
 	for _, slot := range slots {
@@ -237,6 +248,22 @@ func getEventSlotCount(eventType types.EventType) int {
 	}
 
 	return slotCount
+}
+
+func getEventFreeSlotsCount(event *types.Event) int {
+	if slots, ok := EventSlots[event.Type]; ok && slots == "" {
+		totalSlots := getEventSlotCount(event.Type)
+		return totalSlots - len(event.PlayerSlots)
+	} else {
+		freeSlots := 0
+		for _, slot := range event.PlayerSlots {
+			if slot == "" {
+				freeSlots++
+			}
+		}
+
+		return freeSlots
+	}
 }
 
 func getEventSlotsCountByRole(eventType types.EventType, role EventSlotRole) int {
@@ -294,28 +321,18 @@ func getEventRoleNameByPosition(eventType types.EventType, position int) string 
 		letters++
 	}
 
-	switch EventSlotRole(role) {
-	case EventSlotTank:
-		return "🛡️ Tank"
-	case EventSlotHeal:
-		return "🌿 Heal"
-	case EventSlotDPS:
-		return "⚔️ DPS"
-	case EventSlotAny:
-		return "Jogador"
+	if roleName, ok := EventSlotRoleName[EventSlotRole(role)]; ok {
+		return EventSlotRoleEmoji[EventSlotRole(role)] + globals.SEPARATOR + roleName
 	}
 
 	return ""
 }
 
 func resolveEventSlotFromEmoji(emoji string) EventSlotRole {
-	switch emoji {
-	case "🛡️":
-		return EventSlotTank
-	case "🌿":
-		return EventSlotHeal
-	case "⚔️":
-		return EventSlotDPS
+	for role, emojiRole := range EventSlotRoleEmoji {
+		if emojiRole == emoji {
+			return role
+		}
 	}
 
 	return EventSlotAny
@@ -357,4 +374,23 @@ func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
 	}
 
 	return ""
+}
+
+func getEventSlotTypes(event *types.Event) []EventSlotRole {
+	slotTypes := []EventSlotRole{}
+
+	for i, _ := range event.PlayerSlots {
+		role := getEventRoleByPosition(event.Type, i)
+		if role == EventSlotAny {
+			continue
+		}
+
+		if slices.Contains(slotTypes, role) {
+			continue
+		}
+
+		slotTypes = append(slotTypes, role)
+	}
+
+	return slotTypes
 }

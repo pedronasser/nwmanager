@@ -32,7 +32,7 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 	}
 
 	dg.AddHandler(discordutils.CreateHandler(*GuildID, EVENTS_CHANNEL_ID, handlers, db))
-	dg.AddHandler(HandleReactionAdd(*GuildID, dg, db))
+	// dg.AddHandler(HandleReactionAdd(*GuildID, dg, db))
 	dg.AddHandler(HandleMessages(*GuildID, dg, db))
 	dg.AddHandler(HandleEventClose(*GuildID, dg, db))
 

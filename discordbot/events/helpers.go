@@ -2,8 +2,10 @@ package events
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"time"
 
@@ -23,59 +25,118 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 		desc += "```\n"
 	}
 
+	fields := []*discordgo.MessageEmbedField{}
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Organizador",
+		Value:  fmt.Sprintf("<@%s>", event.Owner),
+		Inline: true,
+	})
+
+	slotsCount := getEventSlotCount(event.Type)
+	if slotsCount != -1 {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Vagas",
+			Value:  fmt.Sprintf("%d/%d", getEventFreeSlotsCount(event), slotsCount),
+			Inline: true,
+		})
+	}
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   globals.SEPARATOR,
+		Value:  "",
+		Inline: false,
+	})
+
+	partyField := &discordgo.MessageEmbedField{
+		Name:   "PT 1",
+		Value:  "",
+		Inline: true,
+	}
 	for i, player := range event.PlayerSlots {
+		if i != 0 && i%5 == 0 {
+			fields = append(fields, partyField)
+			if i%10 == 0 {
+				fields = append(fields, &discordgo.MessageEmbedField{
+					Name:   "-",
+					Value:  "",
+					Inline: false,
+				})
+			}
+			ptIndex := i/5 + 1
+			partyField = &discordgo.MessageEmbedField{
+				Name:   fmt.Sprintf("PT %d", ptIndex),
+				Value:  "",
+				Inline: true,
+			}
+		}
+
 		if EventSlots[event.Type] != "" {
 			role := getEventRoleNameByPosition(event.Type, i)
 			playerName := "_[ABERTO]_"
 			if player != "" {
 				playerName = fmt.Sprintf("<@%s>", player)
 			}
-			desc += fmt.Sprintf("%s・%s\n", role, playerName)
+			partyField.Value += fmt.Sprintf("%s・%s\n", role, playerName)
 		} else {
-			desc += fmt.Sprintf("・<@%s>\n", player)
-		}
-
-		if (i+1)%5 == 0 {
-			desc += "\n"
+			partyField.Value += fmt.Sprintf("・<@%s>\n", player)
 		}
 	}
+	fields = append(fields, partyField)
 
-	footer := "・Reaja com 🛡️ para participar como TANK.\n"
-	footer += "・Reaja com 🌿 para participar como HEALER.\n"
-	footer += "・Reaja com ⚔️ para participar como DPS.\n"
-	footer += "・Reaja com ❌ para sair do evento.\n"
-
-	scheduled := ""
-	if event.ScheduledAt != nil {
-		scheduled = fmt.Sprintf(" (%s)", (*event.ScheduledAt).Format("02/01/2006 às 15:04"))
-	}
+	// footer := ""
+	// for _, slot := range getEventSlotTypes(event) {
+	// 	footer += fmt.Sprintf("・Reaja com %s para participar como %s.\n", EventSlotRoleEmoji[slot], EventSlotRoleName[slot])
+	// }
 
 	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("%s - %s%s", getEventName(event.Type), event.Title, scheduled),
+		Title:       getEventTitle(event),
 		Description: desc,
-		Footer: &discordgo.MessageEmbedFooter{
-			Text: footer,
-		},
+		// Footer: &discordgo.MessageEmbedFooter{
+		// 	Text: footer,
+		// },
 		Color: 0x00ff00,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: "https://dqzvgunkova5o.cloudfront.net/statics/2024-10-31/images/NWA_logo.png",
 		},
-		Fields: []*discordgo.MessageEmbedField{
-			{
-				Name:   "Organizador",
-				Value:  fmt.Sprintf("<@%s>", event.Owner),
-				Inline: true,
-			},
-		},
+		Fields: fields,
 	}
 
 	return embed
 }
 
-func removePlayerFromEvent(u *discordgo.User, db types.Database, event *types.Event) {
+func addPlayerToEvent(userId string, db types.Database, event *types.Event, slotType EventSlotRole) error {
+	if EventSlots[event.Type] != "" {
+		freeSlots := getEventFreeSlotsByRole(event, slotType)
+		if len(freeSlots) == 0 {
+			return errors.New("Não há vagas disponíveis para a função escolhida.")
+		}
+
+		slot := freeSlots[0]
+		event.PlayerSlots[slot] = userId
+
+		remainingSlots := getEventFreeSlots(event)
+		if len(remainingSlots) == 0 {
+			event.Status = types.EventStatusCompleted
+			event.CompletedAt = Some(time.Now())
+		}
+	} else {
+		event.PlayerSlots = append(event.PlayerSlots, userId)
+	}
+
+	ctx := context.Background()
+	_, err := db.Collection(types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+	if err != nil {
+		return errors.New("Não foi possível adicionar jogador ao evento.")
+	}
+
+	return nil
+}
+
+func removePlayerFromEvent(userId string, db types.Database, event *types.Event) {
 	foundIndex := -1
 	for i, slot := range event.PlayerSlots {
-		if slot == u.ID {
+		if slot == userId {
 			foundIndex = i
 		}
 	}
@@ -97,6 +158,39 @@ func removePlayerFromEvent(u *discordgo.User, db types.Database, event *types.Ev
 	}
 }
 
+func updateEventPlayerRole(u *discordgo.User, db types.Database, event *types.Event, slotType EventSlotRole) error {
+	if EventSlots[event.Type] == "" {
+		return errors.New("Este evento não possui slots de função.")
+	}
+
+	freeSlots := getEventFreeSlotsByRole(event, slotType)
+	if len(freeSlots) == 0 {
+		return errors.New("Não há vagas disponíveis para a função escolhida.")
+	}
+
+	foundIndex := -1
+	for i, slot := range event.PlayerSlots {
+		if slot == u.ID {
+			foundIndex = i
+		}
+	}
+
+	if foundIndex == -1 {
+		return errors.New("Você não está inscrito neste evento.")
+	}
+
+	event.PlayerSlots[foundIndex] = ""
+	event.PlayerSlots[freeSlots[0]] = u.ID
+
+	ctx := context.Background()
+	_, err := db.Collection(types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+	if err != nil {
+		return errors.New("Não foi possível atualizar a função do jogador.")
+	}
+
+	return nil
+}
+
 func updateEventMessage(s *discordgo.Session, event *types.Event) {
 	events_channel, err := s.Channel(EVENTS_CHANNEL_ID)
 	if err != nil {
@@ -114,23 +208,26 @@ func updateEventMessage(s *discordgo.Session, event *types.Event) {
 	}
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo types.EventType, title, description string, scheduledAt *time.Time) {
+func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, tipo types.EventType, title, description string, scheduledAt *time.Time, isInviteOnly bool) {
 	event := types.Event{
-		ID:          primitive.NewObjectID(),
-		Title:       title,
-		Description: description,
-		Type:        tipo,
-		Owner:       i.Interaction.Member.User.ID,
-		Status:      types.EventStatusOpen,
-		CreatedAt:   Some(time.Now()),
-		PlayerSlots: []string{},
-		ScheduledAt: scheduledAt,
+		ID:           primitive.NewObjectID(),
+		Title:        title,
+		Description:  description,
+		Type:         tipo,
+		Owner:        i.Interaction.Member.User.ID,
+		Status:       types.EventStatusOpen,
+		CreatedAt:    Some(time.Now()),
+		PlayerSlots:  []string{},
+		ScheduledAt:  scheduledAt,
+		IsInviteOnly: isInviteOnly,
 	}
 
 	if EventSlots[event.Type] != "" {
 		for i := 0; i < getEventSlotCount(event.Type); i++ {
 			event.PlayerSlots = append(event.PlayerSlots, "")
 		}
+	} else {
+		event.PlayerSlots = []string{i.Interaction.Member.User.ID}
 	}
 
 	events_channel, err := s.Channel(EVENTS_CHANNEL_ID)
@@ -149,10 +246,40 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db types.
 }
 
 func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) *discordgo.Message {
+	joinActionsRow := discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{},
+	}
+
+	for _, slot := range getEventSlotTypes(event) {
+		joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
+			Label:    fmt.Sprintf("Entrar %s", EventSlotRoleName[slot]),
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("join_%s_%s", event.ID.Hex(), string(slot)),
+			Emoji:    &discordgo.ComponentEmoji{Name: EventSlotRoleEmoji[slot]},
+		})
+	}
+
+	if EventRoles[event.Type] == "" {
+		joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
+			Label:    "Entrar",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("join_%s_A", event.ID.Hex()),
+			Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
+		})
+	}
+
+	joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
+		Label:    "Sair",
+		Style:    discordgo.SecondaryButton,
+		CustomID: fmt.Sprintf("leave_%s", event.ID.Hex()),
+		Emoji:    &discordgo.ComponentEmoji{Name: "❌"},
+	})
+
 	message, err := dg.ChannelMessageSendComplex(events_channel.ID,
 		&discordgo.MessageSend{
 			Embed: buildEventMessage(event),
 			Components: []discordgo.MessageComponent{
+				joinActionsRow,
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{
@@ -179,25 +306,17 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 		log.Fatalf("Cannot send event message: %v", err)
 	}
 
-	err = dg.MessageReactionAdd(events_channel.ID, message.ID, "🛡️")
-	if err != nil {
-		log.Fatalf("Cannot add reaction to message: %v", err)
-	}
+	// for _, slot := range getEventSlotTypes(event) {
+	// 	err = dg.MessageReactionAdd(events_channel.ID, message.ID, EventSlotRoleEmoji[slot])
+	// 	if err != nil {
+	// 		log.Fatalf("Cannot add reaction to message: %v", err)
+	// 	}
+	// }
 
-	err = dg.MessageReactionAdd(events_channel.ID, message.ID, "🌿")
-	if err != nil {
-		log.Fatalf("Cannot add reaction to message: %v", err)
-	}
-
-	err = dg.MessageReactionAdd(events_channel.ID, message.ID, "⚔️")
-	if err != nil {
-		log.Fatalf("Cannot add reaction to message: %v", err)
-	}
-
-	err = dg.MessageReactionAdd(events_channel.ID, message.ID, "❌")
-	if err != nil {
-		log.Fatalf("Cannot add reaction to message: %v", err)
-	}
+	// err = dg.MessageReactionAdd(events_channel.ID, message.ID, "❌")
+	// if err != nil {
+	// 	log.Fatalf("Cannot add reaction to message: %v", err)
+	// }
 
 	return message
 }
@@ -242,4 +361,59 @@ func ownerHasEvent(ctx context.Context, db types.Database, owner *discordgo.User
 	}
 
 	return true
+}
+
+func getEventTitle(event *types.Event) string {
+	title := fmt.Sprintf("%s - %s", getEventTypeName(event.Type), event.Title)
+	if event.ScheduledAt != nil {
+		title += fmt.Sprintf(" (%s)", (*event.ScheduledAt).Format("02/01/2006 às 15:04"))
+	}
+
+	return title
+}
+
+func sendJoinRequest(
+	ctx context.Context,
+	db types.Database,
+	s *discordgo.Session,
+	event *types.Event,
+	user *discordgo.User,
+	slotType EventSlotRole,
+) error {
+	channel, err := s.UserChannelCreate(event.Owner)
+	if err != nil {
+		return err
+	}
+
+	var content string
+	if slotType == EventSlotAny {
+		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(event))
+	} else {
+		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s** como **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(event), EventSlotRoleName[slotType])
+	}
+
+	_, err = s.ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{
+		Content: content,
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Aceitar",
+						Style:    discordgo.SuccessButton,
+						CustomID: fmt.Sprintf("approve_%s_%s_%s", event.ID.Hex(), user.ID, string(slotType)),
+					},
+					discordgo.Button{
+						Label:    "Rejeitar",
+						Style:    discordgo.DangerButton,
+						CustomID: fmt.Sprintf("reject_%s_%s", event.ID.Hex(), user.ID),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

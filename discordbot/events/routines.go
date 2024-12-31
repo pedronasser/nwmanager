@@ -54,7 +54,7 @@ func eventsCheckRoutine(db types.Database, dg *discordgo.Session) {
 					go func(dg *discordgo.Session) {
 						for _, player := range event.PlayerSlots {
 							if player != "" {
-								discordutils.SendMemberDM(dg, player, fmt.Sprintf("O evento **%s** em que você se inscreveu está agendado para iniciar em **15 minutos**. Verifique o canal de eventos para mais informações.", fmt.Sprintf("%s - %s", getEventName(event.Type), event.Title)))
+								discordutils.SendMemberDM(dg, player, fmt.Sprintf("O evento **%s** em que você se inscreveu está agendado para iniciar em **15 minutos**. Verifique o canal de eventos para mais informações.", fmt.Sprintf("%s - %s", getEventTypeName(event.Type), event.Title)))
 							}
 						}
 					}(dg)

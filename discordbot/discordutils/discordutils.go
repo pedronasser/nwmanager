@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
 
-func SendModal(s *discordgo.Session, i *discordgo.InteractionCreate, id string, title string, components ...discordgo.MessageComponent) {
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+func SendModal(s *discordgo.Session, i *discordgo.InteractionCreate, id string, title string, components ...discordgo.MessageComponent) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
 			Title:      title,
@@ -19,13 +20,10 @@ func SendModal(s *discordgo.Session, i *discordgo.InteractionCreate, id string, 
 			Components: components,
 		},
 	})
-	if err != nil {
-		panic(err)
-	}
 }
 
-func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate, id string, content string, components ...discordgo.MessageComponent) {
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate, id string, content string, components ...discordgo.MessageComponent) error {
+	return s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content:    fmt.Sprintf(":robot:\n\n%s", content),
@@ -34,19 +32,19 @@ func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate
 			Components: components,
 		},
 	})
-	if err != nil {
-		panic(err)
-	}
 }
 
 func CreateHandler(guildID string, channelID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if i.GuildID != guildID || i.ChannelID != channelID {
+		channel, err := s.Channel(i.ChannelID)
+		if err != nil {
 			return
 		}
 
-		// d, _ := json.MarshalIndent(i, "", "\t")
-		// fmt.Println(string(d))
+		if channel.Type == discordgo.ChannelTypeGuildText && (i.ChannelID != channelID || i.GuildID != guildID) {
+			return
+		}
+
 		switch i.Type {
 		case discordgo.InteractionApplicationCommand:
 			if h, ok := handlers["/"+i.ApplicationCommandData().Name]; ok {
@@ -123,7 +121,9 @@ func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate,
 		panic(err)
 	}
 
-	time.Sleep(destroyDelay)
+	if destroyDelay > 0 {
+		time.Sleep(destroyDelay)
+	}
 
 	err = s.InteractionResponseDelete(i.Interaction)
 	if err != nil {
@@ -131,18 +131,18 @@ func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate,
 	}
 }
 
-func SendMemberDM(s *discordgo.Session, userID string, content string) error {
+func SendMemberDM(s *discordgo.Session, userID string, content string) (*discordgo.Message, error) {
 	channel, err := s.UserChannelCreate(userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = s.ChannelMessageSend(channel.ID, content)
+	msg, err := s.ChannelMessageSend(channel.ID, content)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return msg, nil
 }
 
 func GetGuildMembers(s *discordgo.Session, guildID string, memberRoleID string) ([]*discordgo.Member, error) {
@@ -199,4 +199,12 @@ func IsMemberAdmin(member *discordgo.Member) bool {
 	}
 
 	return false
+}
+
+func IsMember(member *discordgo.Member) bool {
+	if globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME] == "" {
+		panic("MEMBER_ROLE_NAME is not set")
+	}
+
+	return slices.Contains(member.Roles, globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
 }
