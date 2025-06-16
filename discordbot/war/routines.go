@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
 	"nwmanager/types"
 	"time"
@@ -22,14 +24,14 @@ var (
 	EVENT_NOTIFICATION_REMINDER         time.Duration = 15 * time.Minute
 )
 
-func eventsCheckRoutine(db types.Database, dg *discordgo.Session, guildID string) {
+func eventsCheckRoutine(db database.Database, dg *discordgo.Session, guildID string) {
 	// Cleanup completed events
 	ticker := time.NewTicker(EVENT_CHECK_INTERVAL)
 	for {
 		<-ticker.C
 		fmt.Println("Checking wars...")
 		ctx := context.Background()
-		res, err := db.Collection(types.WarsCollection).Find(ctx, bson.M{})
+		res, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).Find(ctx, bson.M{})
 		if err != nil {
 			log.Fatalf("Cannot get wars: %v", err)
 		}

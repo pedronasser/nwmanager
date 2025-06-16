@@ -3,14 +3,13 @@ package database
 import (
 	"context"
 	"time"
-	"nwmanager/types"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-func NewMongoDB(ctx context.Context, url string) (types.Database, error) {
+func NewMongoDB(ctx context.Context, url string) (Database, error) {
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(url).SetServerAPIOptions(serverAPI)
 

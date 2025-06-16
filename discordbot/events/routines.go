@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
 	"nwmanager/types"
 	"time"
@@ -21,14 +23,14 @@ var (
 	EVENT_NOTIFICATION_REMINDER time.Duration = 15 * time.Minute
 )
 
-func eventsCheckRoutine(db types.Database, dg *discordgo.Session) {
+func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 	// Cleanup completed events
 	ticker := time.NewTicker(EVENT_CHECK_INTERVAL)
 	for {
 		<-ticker.C
 		fmt.Println("Checking events...")
 		ctx := context.Background()
-		res, err := db.Collection(types.EventsCollection).Find(ctx, bson.M{})
+		res, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx, bson.M{})
 		if err != nil {
 			log.Fatalf("Cannot get events: %v", err)
 		}
@@ -59,7 +61,7 @@ func eventsCheckRoutine(db types.Database, dg *discordgo.Session) {
 						}
 					}(dg)
 
-					_, err := db.Collection(types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"notified_at": now}})
+					_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"notified_at": now}})
 					if err != nil {
 						log.Fatalf("Cannot update event: %v", err)
 					}

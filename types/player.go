@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"fmt"
+	"nwmanager/database"
+	"nwmanager/discordbot/globals"
 	"nwmanager/helpers"
 	"time"
 
@@ -33,8 +35,8 @@ type PlayerStats struct {
 	OPRPrints           int        `json:"opr_prints" bson:"opr_prints"`
 }
 
-func GetPlayerByDiscordID(ctx context.Context, db Database, discordID string) (*Player, error) {
-	q := db.Collection(PlayerCollection).FindOne(ctx, bson.M{"discord_id": discordID})
+func GetPlayerByDiscordID(ctx context.Context, db database.Database, discordID string) (*Player, error) {
+	q := db.Collection(globals.DB_PREFIX+PlayerCollection).FindOne(ctx, bson.M{"discord_id": discordID})
 	if q.Err() != nil {
 		if q.Err() == mongo.ErrNoDocuments {
 			return nil, nil
@@ -51,8 +53,8 @@ func GetPlayerByDiscordID(ctx context.Context, db Database, discordID string) (*
 	return &player, nil
 }
 
-func GetPlayerByTicketChannel(ctx context.Context, db Database, ticketChannel string) (*Player, error) {
-	q := db.Collection(PlayerCollection).FindOne(ctx, bson.M{"ticket_channel": ticketChannel})
+func GetPlayerByTicketChannel(ctx context.Context, db database.Database, ticketChannel string) (*Player, error) {
+	q := db.Collection(globals.DB_PREFIX+PlayerCollection).FindOne(ctx, bson.M{"ticket_channel": ticketChannel})
 	if q.Err() != nil {
 		if q.Err() == mongo.ErrNoDocuments {
 			return nil, nil
@@ -73,8 +75,8 @@ func GetPlayerByTicketChannel(ctx context.Context, db Database, ticketChannel st
 	return &player, nil
 }
 
-func InsertPlayer(ctx context.Context, db Database, player *Player) error {
-	_, err := db.Collection(PlayerCollection).InsertOne(ctx, player)
+func InsertPlayer(ctx context.Context, db database.Database, player *Player) error {
+	_, err := db.Collection(globals.DB_PREFIX+PlayerCollection).InsertOne(ctx, player)
 	if err != nil {
 		return fmt.Errorf("Cannot insert player: %v", err)
 	}
@@ -82,8 +84,8 @@ func InsertPlayer(ctx context.Context, db Database, player *Player) error {
 	return nil
 }
 
-func DeletePlayer(ctx context.Context, db Database, player *Player) error {
-	_, err := db.Collection(PlayerCollection).DeleteOne(ctx, bson.M{"_id": player.ID})
+func DeletePlayer(ctx context.Context, db database.Database, player *Player) error {
+	_, err := db.Collection(globals.DB_PREFIX+PlayerCollection).DeleteOne(ctx, bson.M{"_id": player.ID})
 	if err != nil {
 		return fmt.Errorf("Cannot delete player: %v", err)
 	}
@@ -91,8 +93,8 @@ func DeletePlayer(ctx context.Context, db Database, player *Player) error {
 	return nil
 }
 
-func ArchivePlayer(ctx context.Context, db Database, player *Player) error {
-	_, err := db.Collection(PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$set": bson.M{"archived_at": helpers.GetCurrentTimeAsUTC()}})
+func ArchivePlayer(ctx context.Context, db database.Database, player *Player) error {
+	_, err := db.Collection(globals.DB_PREFIX+PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$set": bson.M{"archived_at": helpers.GetCurrentTimeAsUTC()}})
 	if err != nil {
 		return fmt.Errorf("Cannot delete player: %v", err)
 	}
@@ -100,8 +102,8 @@ func ArchivePlayer(ctx context.Context, db Database, player *Player) error {
 	return nil
 }
 
-func UnarchivePlayer(ctx context.Context, db Database, player *Player) error {
-	_, err := db.Collection(PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$unset": bson.M{"archived_at": 1}})
+func UnarchivePlayer(ctx context.Context, db database.Database, player *Player) error {
+	_, err := db.Collection(globals.DB_PREFIX+PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$unset": bson.M{"archived_at": 1, "ticket_channel": 1}})
 	if err != nil {
 		return fmt.Errorf("Cannot delete player: %v", err)
 	}
@@ -109,8 +111,8 @@ func UnarchivePlayer(ctx context.Context, db Database, player *Player) error {
 	return nil
 }
 
-func UpdatePlayer(ctx context.Context, db Database, player *Player) error {
-	_, err := db.Collection(PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$set": player})
+func UpdatePlayer(ctx context.Context, db database.Database, player *Player) error {
+	_, err := db.Collection(globals.DB_PREFIX+PlayerCollection).UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{"$set": player})
 	if err != nil {
 		return fmt.Errorf("Cannot update player: %v", err)
 	}
@@ -118,8 +120,8 @@ func UpdatePlayer(ctx context.Context, db Database, player *Player) error {
 	return nil
 }
 
-func GetPlayers(ctx context.Context, db Database) ([]Player, error) {
-	cursor, err := db.Collection(PlayerCollection).Find(ctx, bson.M{})
+func GetPlayers(ctx context.Context, db database.Database) ([]Player, error) {
+	cursor, err := db.Collection(globals.DB_PREFIX+PlayerCollection).Find(ctx, bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get players: %v", err)
 	}
@@ -134,8 +136,8 @@ func GetPlayers(ctx context.Context, db Database) ([]Player, error) {
 	return players, nil
 }
 
-func GetActivePlayers(ctx context.Context, db Database) ([]Player, error) {
-	cursor, err := db.Collection(PlayerCollection).Find(ctx, bson.M{
+func GetActivePlayers(ctx context.Context, db database.Database) ([]Player, error) {
+	cursor, err := db.Collection(globals.DB_PREFIX+PlayerCollection).Find(ctx, bson.M{
 		"archived_at": bson.M{"$eq": nil},
 	})
 	if err != nil {
@@ -152,8 +154,8 @@ func GetActivePlayers(ctx context.Context, db Database) ([]Player, error) {
 	return players, nil
 }
 
-func GetArchivedPlayers(ctx context.Context, db Database) ([]Player, error) {
-	cursor, err := db.Collection(PlayerCollection).Find(ctx, bson.M{"archived_at": bson.M{"$ne": nil}})
+func GetArchivedPlayers(ctx context.Context, db database.Database) ([]Player, error) {
+	cursor, err := db.Collection(globals.DB_PREFIX+PlayerCollection).Find(ctx, bson.M{"archived_at": bson.M{"$ne": nil}})
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get archived players: %v", err)
 	}

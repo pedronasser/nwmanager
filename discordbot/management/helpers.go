@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/forPelevin/gomoji"
 )
 
-func processPlayerArchiving(ctx context.Context, dg *discordgo.Session, db types.Database, player *types.Player) {
+func processPlayerArchiving(ctx context.Context, dg *discordgo.Session, db database.Database, player *types.Player) {
 	err := types.ArchivePlayer(ctx, db, player)
 	if err != nil {
 		log.Fatalf("Cannot delete player: %v", err)
@@ -25,7 +26,7 @@ func processPlayerArchiving(ctx context.Context, dg *discordgo.Session, db types
 	log.Printf("Player '%s' has been archived", player.IGN)
 }
 
-func processPlayerUnarchiving(ctx context.Context, dg *discordgo.Session, db types.Database, player *types.Player) {
+func processPlayerUnarchiving(ctx context.Context, dg *discordgo.Session, db database.Database, player *types.Player) {
 	err := types.UnarchivePlayer(ctx, db, player)
 	if err != nil {
 		log.Fatalf("Cannot delete player: %v", err)
@@ -38,7 +39,7 @@ func processPlayerUnarchiving(ctx context.Context, dg *discordgo.Session, db typ
 	log.Printf("Player '%s' has been unarchived", player.IGN)
 }
 
-func processPlayerDeleting(ctx context.Context, dg *discordgo.Session, db types.Database, player *types.Player) {
+func processPlayerDeleting(ctx context.Context, dg *discordgo.Session, db database.Database, player *types.Player) {
 	if player.TicketChannel != "" {
 		_, _ = dg.ChannelDelete(player.TicketChannel)
 	}
@@ -175,4 +176,14 @@ func shouldHaveTicket(member *discordgo.Member) bool {
 	}
 
 	return true
+}
+
+func IsTicketChannel(channel *discordgo.Channel) bool {
+	for _, id := range globals.CLASS_CATEGORY_IDS {
+		if channel.ParentID == id {
+			return true
+		}
+	}
+
+	return false
 }

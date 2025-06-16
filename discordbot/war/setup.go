@@ -4,15 +4,25 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
-	"nwmanager/types"
+	"os"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/joho/godotenv"
 )
 
-func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, db types.Database) {
+func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, db database.Database) {
 	fmt.Println("Loading war")
+
+	_ = godotenv.Load()
+	WAR_CHANNEL_ID = os.Getenv("WAR_CHANNEL_ID")
+	if WAR_CHANNEL_ID == "" {
+		fmt.Println("WAR_CHANNEL_ID is not set")
+		os.Exit(1)
+	}
+
 	_ = setupEventsChannel(ctx, dg, db, globals.ACCESS_ROLE_IDS[globals.EVERYONE_ROLE_NAME], globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
 
 	_, err := dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{

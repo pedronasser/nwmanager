@@ -2,6 +2,8 @@ package types
 
 import (
 	"context"
+	"nwmanager/database"
+	"nwmanager/discordbot/globals"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -58,7 +60,7 @@ type Event struct {
 	MessageID    string             `bson:"message_id" json:"message_id"`
 }
 
-func GetEventByID(ctx context.Context, db Database, id string) (*Event, error) {
+func GetEventByID(ctx context.Context, db database.Database, id string) (*Event, error) {
 
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -66,7 +68,7 @@ func GetEventByID(ctx context.Context, db Database, id string) (*Event, error) {
 	}
 
 	var event Event
-	err = db.Collection(EventsCollection).FindOne(ctx, bson.M{"_id": oid}).Decode(&event)
+	err = db.Collection(globals.DB_PREFIX+EventsCollection).FindOne(ctx, bson.M{"_id": oid}).Decode(&event)
 	if err != nil {
 		return nil, err
 	}

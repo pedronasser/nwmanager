@@ -7,10 +7,12 @@ import (
 	"nwmanager/discordbot/events"
 	"nwmanager/discordbot/globals"
 	"nwmanager/discordbot/management"
+	"nwmanager/discordbot/signup"
 	"nwmanager/discordbot/war"
 	"nwmanager/discordbot/web"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -57,16 +59,26 @@ func main() {
 		log.Fatalf("Cannot add guild to state: %v", err)
 	}
 
+	fmt.Println(shouldLoadModule("management"))
+
 	db, err := database.NewMongoDB(ctx, os.Getenv("MONGO_URI"))
 	if err != nil {
 		log.Fatalf("failed to create database: %v", err)
 	}
 
-	globals.Setup(ctx, dg, &AppID, &GuildID, db)
-	// register.Setup(dg, &AppID, &GuildID, db)
-	events.Setup(ctx, dg, &AppID, &GuildID, db)
-	war.Setup(ctx, dg, &AppID, &GuildID, db)
-	management.Setup(ctx, dg, &AppID, &GuildID, db)
+	globals.Setup(ctx, dg, &AppID, &GuildID)
+	if shouldLoadModule("events") {
+		events.Setup(ctx, dg, &AppID, &GuildID, db)
+	}
+	if shouldLoadModule("war") {
+		war.Setup(ctx, dg, &AppID, &GuildID, db)
+	}
+	if shouldLoadModule("management") {
+		management.Setup(ctx, dg, &AppID, &GuildID, db)
+	}
+	if shouldLoadModule("signup") {
+		signup.Setup(ctx, dg, &AppID, &GuildID, db)
+	}
 
 	// Just like the ping pong example, we only care about receiving message
 	// events in this example.
@@ -87,4 +99,25 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+func shouldLoadModule(m string) bool {
+	modulesEnv := os.Getenv("MODULES")
+	if modulesEnv == "" {
+		return true
+	}
+
+	if modulesEnv == "all" {
+		return true
+	}
+
+	var modules []string = strings.Split(modulesEnv, ",")
+
+	for _, module := range modules {
+		if module == m {
+			return true
+		}
+	}
+
+	return false
 }

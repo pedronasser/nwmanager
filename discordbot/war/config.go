@@ -1,25 +1,12 @@
 package war
 
 import (
-	"fmt"
 	"nwmanager/types"
-	"os"
-
-	"github.com/joho/godotenv"
 )
 
 var (
 	WAR_CHANNEL_ID = ""
 )
-
-func init() {
-	_ = godotenv.Load()
-	WAR_CHANNEL_ID = os.Getenv("WAR_CHANNEL_ID")
-	if WAR_CHANNEL_ID == "" {
-		fmt.Println("WAR_CHANNEL_ID is not set")
-		os.Exit(1)
-	}
-}
 
 const (
 	EVENTS_CHANNEL_NAME = "🪖・guerra"

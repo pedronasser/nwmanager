@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
@@ -23,7 +24,7 @@ var ImageTypeSelections = []string{
 	"Print de OPR",
 }
 
-func HandleTicketMessages(ctx context.Context, dg *discordgo.Session, GuildID *string, db types.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
+func HandleTicketMessages(ctx context.Context, dg *discordgo.Session, GuildID *string, db database.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
 		if i.GuildID != *GuildID {
 			return
@@ -56,7 +57,7 @@ func HandleTicketMessages(ctx context.Context, dg *discordgo.Session, GuildID *s
 			return
 		}
 
-		db.Collection(types.PlayerCollection).
+		db.Collection(globals.DB_PREFIX+types.PlayerCollection).
 			UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{
 				"$set": bson.M{"stats.last_ticket_message_at": time.Now()},
 			})
@@ -112,7 +113,7 @@ func HandlePlayerTicketImageUpload(ctx context.Context, s *discordgo.Session, i 
 	}
 }
 
-func HandleTicketInteractions(ctx context.Context, dg *discordgo.Session, GuildID *string, db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func HandleTicketInteractions(ctx context.Context, dg *discordgo.Session, GuildID *string, db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if i.GuildID != *GuildID {
 			return
@@ -132,7 +133,7 @@ func HandleTicketInteractions(ctx context.Context, dg *discordgo.Session, GuildI
 	}
 }
 
-func HandleTicketImageInteraction(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+func HandleTicketImageInteraction(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 	// ticket-image_0_<message_id>
 	// ticket-image_1_<message_id>
 
@@ -164,7 +165,7 @@ func HandleTicketImageInteraction(ctx context.Context, s *discordgo.Session, i *
 			buffer, _ := io.ReadAll(resp.Body)
 			s.ChannelFileSendWithMessage(OPR_PRINTS_CHANNEL_ID, fmt.Sprintf("**%s** enviada por <@%s>", ImageTypeSelections[selection], player.DiscordID), original.Attachments[0].Filename, bytes.NewBuffer(buffer))
 
-			db.Collection(types.PlayerCollection).
+			db.Collection(globals.DB_PREFIX+types.PlayerCollection).
 				UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{
 					"$set": bson.M{
 						"stats.last_opr_print_at": time.Now(),
@@ -179,7 +180,7 @@ func HandleTicketImageInteraction(ctx context.Context, s *discordgo.Session, i *
 		// s.MessageReactionAdd(i.ChannelID, message_id, "✅")
 		discordutils.ReplyEphemeralMessage(s, i, "Agradecemos pelo envio. Notificaremos um build leader para fazer a avaliação.", 15*time.Second)
 		s.ChannelMessageSend(OPR_PRINTS_CHANNEL_ID, fmt.Sprintf("<@&%s>, **<@%s>** enviou uma print de seus equipamentos em <#%s>", globals.CLASS_LEADER_ROLE_IDS[player.WarClass], player.DiscordID, player.TicketChannel))
-		db.Collection(types.PlayerCollection).
+		db.Collection(globals.DB_PREFIX+types.PlayerCollection).
 			UpdateOne(ctx, bson.M{"_id": player.ID}, bson.M{
 				"$set": bson.M{
 					"stats.last_equip_update": time.Now(),
@@ -188,14 +189,4 @@ func HandleTicketImageInteraction(ctx context.Context, s *discordgo.Session, i *
 	}
 
 	s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
-}
-
-func IsTicketChannel(channel *discordgo.Channel) bool {
-	for _, id := range globals.CLASS_CATEGORY_IDS {
-		if channel.ParentID == id {
-			return true
-		}
-	}
-
-	return false
 }

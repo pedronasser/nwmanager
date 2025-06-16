@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
 	"nwmanager/types"
 	"slices"
@@ -16,8 +18,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database){
-	"/evento": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database){
+	"/evento": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -44,7 +46,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"msg:create_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:create_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -72,7 +74,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"msg:create_closed_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:create_closed_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -99,9 +101,9 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"/encerrar": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"/encerrar": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		ctx := context.Background()
-		res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"owner": i.Member.User.ID, "status": types.EventStatusOpen})
+		res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"owner": i.Member.User.ID, "status": types.EventStatusOpen})
 		if res.Err() != nil {
 			discordutils.ReplyEphemeralMessage(s, i, "Você não possui um evento em andamento.", 5*time.Second)
 			return
@@ -117,7 +119,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
 	},
 
-	"msg:evento:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:evento:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		if _, ok := EventsData[i.Member.User.ID]; !ok {
 			return
 		}
@@ -180,7 +182,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		s.InteractionResponseDelete(i.Interaction)
 	},
 
-	"msg:join_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:join_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "join_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -222,7 +224,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		discordutils.ReplyEphemeralMessage(s, i, "Você foi inscrito no evento.", 5*time.Second)
 	},
 
-	"msg:leave_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:leave_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		eventId := strings.TrimPrefix(i.MessageComponentData().CustomID, "leave_")
 
 		ctx := context.Background()
@@ -246,7 +248,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		discordutils.ReplyEphemeralMessage(s, i, "Você foi removido do evento.", 5*time.Second)
 	},
 
-	"msg:approve_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:approve_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "approve_")
 		parts := strings.Split(id, "_")
 		fmt.Println(parts)
@@ -284,7 +286,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
 	},
 
-	"msg:reject_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"msg:reject_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "reject_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -323,7 +325,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 
 	},
 
-	"modal:reject_confirm_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"modal:reject_confirm_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		id := strings.TrimPrefix(i.ModalSubmitData().CustomID, "reject_confirm_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -343,7 +345,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
 	},
 
-	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		data := i.ModalSubmitData()
 		if v, ok := EventsData[i.Member.User.ID]; ok {
 			title := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
@@ -374,7 +376,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 
 var EventsData = map[string]*types.Event{}
 
-func HandleMessages(GuildID string, s *discordgo.Session, db types.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
+func HandleMessages(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
 		if GuildID != i.GuildID || i.ChannelID != EVENTS_CHANNEL_ID {
 			return
@@ -390,7 +392,7 @@ func HandleMessages(GuildID string, s *discordgo.Session, db types.Database) fun
 	}
 }
 
-func HandleEventClose(GuildID string, s *discordgo.Session, db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func HandleEventClose(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if GuildID != i.GuildID || i.ChannelID != EVENTS_CHANNEL_ID {
 			return
@@ -417,14 +419,14 @@ func HandleEventClose(GuildID string, s *discordgo.Session, db types.Database) f
 	}
 }
 
-func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 	id := strings.TrimPrefix(i.MessageComponentData().CustomID, "close_event_")
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -445,13 +447,13 @@ func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
 }
 
-func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -531,13 +533,13 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 	)
 }
 
-func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -572,7 +574,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	event.Title = title
 	event.Description = description
 	event.ScheduledAt = scheduledAt
-	_, err = db.Collection(types.EventsCollection).UpdateOne(ctx,
+	_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx,
 		bson.M{"_id": oid},
 		bson.M{"$set": bson.M{"title": title, "description": description}},
 	)
@@ -584,7 +586,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ATUALIZADO.**", 5*time.Second)
 }
 
-// func HandleReactionAdd(GuildID string, s *discordgo.Session, db types.Database) func(s *discordgo.Session, reaction *discordgo.MessageReactionAdd) {
+// func HandleReactionAdd(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, reaction *discordgo.MessageReactionAdd) {
 // 	return func(s *discordgo.Session, i *discordgo.MessageReactionAdd) {
 // 		if GuildID != i.GuildID {
 // 			return
@@ -597,7 +599,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 // 		_ = s.MessageReactionRemove(i.ChannelID, i.MessageID, i.Emoji.Name, i.UserID)
 
 // 		ctx := context.Background()
-// 		res := db.Collection(types.EventsCollection).FindOne(ctx, bson.M{"message_id": i.MessageID})
+// 		res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"message_id": i.MessageID})
 // 		if res.Err() != nil {
 // 			return
 // 		}
@@ -659,7 +661,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 // 			event.PlayerSlots = append(event.PlayerSlots, i.UserID)
 // 		}
 
-// 		_, err = db.Collection(types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+// 		_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
 // 		if err != nil {
 // 			return
 // 		}
@@ -671,43 +673,38 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 func setupEventsChannel(
 	ctx context.Context,
 	dg *discordgo.Session,
-	db types.Database,
+	db database.Database,
 	everyoneRole string,
 	memberRole string,
 ) *discordgo.Channel {
-
-	events_channel, err := dg.ChannelEdit(EVENTS_CHANNEL_ID, &discordgo.ChannelEdit{
-		Name:   EVENTS_CHANNEL_NAME,
-		Locked: Some(true),
-		PermissionOverwrites: []*discordgo.PermissionOverwrite{
-			{
-				ID:    everyoneRole,
-				Type:  discordgo.PermissionOverwriteTypeRole,
-				Allow: 0,
-				Deny:  discordgo.PermissionReadMessageHistory | discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionAddReactions,
-			},
-			{
-				ID:    memberRole,
-				Type:  discordgo.PermissionOverwriteTypeRole,
-				Allow: discordgo.PermissionReadMessageHistory | discordgo.PermissionAddReactions | discordgo.PermissionViewChannel | discordgo.PermissionUseSlashCommands | discordgo.PermissionSendMessages,
-				Deny:  0,
-			},
-		},
-	})
+	events_channel, err := dg.Channel(EVENTS_CHANNEL_ID)
 	if err != nil {
-		log.Fatalf("Cannot edit welcome channel: %v", err)
+		log.Fatalf("Cannot get events channel: %v", err)
 	}
 
-	msgs, err := dg.ChannelMessages(events_channel.ID, 100, "", "", "")
-	if err != nil {
-		log.Fatalf("Cannot get channel messages: %v", err)
-	}
-	for _, msg := range msgs {
-		err = dg.ChannelMessageDelete(events_channel.ID, msg.ID)
-		if err != nil {
-			log.Fatalf("Cannot delete channel message: %v", err)
-		}
-	}
+	// events_channel, err := dg.ChannelEdit(EVENTS_CHANNEL_ID, &discordgo.ChannelEdit{
+	// 	Name:   channel.Name,
+	// 	Locked: Some(true),
+	// 	PermissionOverwrites: []*discordgo.PermissionOverwrite{
+	// 		{
+	// 			ID:    everyoneRole,
+	// 			Type:  discordgo.PermissionOverwriteTypeRole,
+	// 			Allow: 0,
+	// 			Deny:  discordgo.PermissionReadMessageHistory | discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionAddReactions,
+	// 		},
+	// 		{
+	// 			ID:    memberRole,
+	// 			Type:  discordgo.PermissionOverwriteTypeRole,
+	// 			Allow: discordgo.PermissionReadMessageHistory | discordgo.PermissionAddReactions | discordgo.PermissionViewChannel | discordgo.PermissionUseSlashCommands | discordgo.PermissionSendMessages,
+	// 			Deny:  0,
+	// 		},
+	// 	},
+	// })
+	// if err != nil {
+	// 	log.Fatalf("Cannot edit welcome channel: %v", err)
+	// }
+
+	discordutils.ClearChannel(dg, EVENTS_CHANNEL_ID)
 
 	_, err = dg.ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
 		Embed: &discordgo.MessageEmbed{
@@ -739,7 +736,7 @@ func setupEventsChannel(
 	}
 
 	// Query all events
-	c, err := db.Collection(types.EventsCollection).Find(ctx, bson.M{
+	c, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx, bson.M{
 		"status": types.EventStatusOpen,
 	})
 	if err != nil {
@@ -754,7 +751,7 @@ func setupEventsChannel(
 	for _, event := range events {
 		message := createEventMessage(dg, events_channel, &event)
 
-		_, err = db.Collection(types.EventsCollection).UpdateOne(ctx, bson.M{
+		_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{
 			"_id": event.ID,
 		}, bson.M{
 			"$set": bson.M{

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
 	"nwmanager/types"
 	"strings"
@@ -15,8 +17,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database){
-	"/guerra": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database){
+	"/guerra": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		discordutils.SendModal(s, i, "create", "Criação de evento de guerra",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
@@ -70,7 +72,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		data := i.ModalSubmitData()
 		territory := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 		description := data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
@@ -90,7 +92,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	},
 }
 
-func ClearChannelMessages(GuildID string, s *discordgo.Session, db types.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
+func ClearChannelMessages(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
 		if GuildID != i.GuildID {
 			return
@@ -106,7 +108,7 @@ func ClearChannelMessages(GuildID string, s *discordgo.Session, db types.Databas
 	}
 }
 
-func HandleWarInteractions(GuildID string, s *discordgo.Session, db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func HandleWarInteractions(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if i.ChannelID != WAR_CHANNEL_ID {
 			return
@@ -185,7 +187,7 @@ func HandleWarInteractions(GuildID string, s *discordgo.Session, db types.Databa
 
 var JoinInteractions = make(map[string]*discordgo.Interaction)
 
-func handleEventJoin(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventJoin(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -216,7 +218,7 @@ func handleEventJoin(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	}
 
 	war.Players[i.Member.User.ID] = types.WarClass(class)
-	_, err = db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{
+	_, err = db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{
 		"_id": war.ID,
 	}, bson.M{
 		"$set": bson.M{
@@ -239,14 +241,14 @@ func handleEventJoin(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	}
 }
 
-func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database) {
+func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 	id := strings.TrimPrefix(i.MessageComponentData().CustomID, "close_event_")
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -267,13 +269,13 @@ func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 	discordutils.ReplyEphemeralMessage(s, i, "**GUERRA ENCERRADA.**", 5*time.Second)
 }
 
-func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -347,13 +349,13 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 	)
 }
 
-func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := db.Collection(globals.DB_PREFIX+types.WarsCollection).FindOne(ctx, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -388,7 +390,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	war.Territory = territory
 	war.Description = description
 	war.ScheduledAt = scheduledAt
-	_, err = db.Collection(types.WarsCollection).UpdateOne(ctx,
+	_, err = db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx,
 		bson.M{"_id": oid},
 		bson.M{"$set": bson.M{"territory": territory, "description": description}},
 	)
@@ -400,7 +402,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db ty
 	discordutils.ReplyEphemeralMessage(s, i, "**GUERRA ATUALIZADA.**", 5*time.Second)
 }
 
-func handleEventLeave(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, id string) {
+func handleEventLeave(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
 	ctx := context.Background()
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -425,7 +427,7 @@ func handleEventLeave(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 
 	delete(war.Players, i.Member.User.ID)
 
-	_, err = db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{
+	_, err = db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{
 		"_id": war.ID,
 	}, bson.M{
 		"$unset": bson.M{
@@ -444,7 +446,7 @@ func handleEventLeave(s *discordgo.Session, i *discordgo.InteractionCreate, db t
 func setupEventsChannel(
 	ctx context.Context,
 	dg *discordgo.Session,
-	db types.Database,
+	db database.Database,
 	everyoneRole string,
 	memberRole string,
 ) *discordgo.Channel {
@@ -483,7 +485,7 @@ func setupEventsChannel(
 	}
 
 	// Query all events
-	c, err := db.Collection(types.WarsCollection).Find(ctx, bson.M{
+	c, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).Find(ctx, bson.M{
 		"status": types.EventStatusOpen,
 	})
 	if err != nil {
@@ -498,7 +500,7 @@ func setupEventsChannel(
 	for _, war := range wars {
 		message := createWarMessage(dg, wars_channel, &war)
 
-		_, err = db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{
+		_, err = db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{
 			"_id": war.ID,
 		}, bson.M{
 			"$set": bson.M{

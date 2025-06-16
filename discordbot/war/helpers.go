@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"strings"
 	"time"
@@ -79,11 +81,11 @@ func buildWarMessage(event *types.War) *discordgo.MessageEmbed {
 	return embed
 }
 
-func removePlayerFromEvent(u *discordgo.User, db types.Database, war *types.War) {
+func removePlayerFromEvent(u *discordgo.User, db database.Database, war *types.War) {
 	delete(war.Players, u.ID)
 
 	ctx := context.Background()
-	_, err := db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"players": war.Players}})
+	_, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"players": war.Players}})
 	if err != nil {
 		return
 	}
@@ -106,7 +108,7 @@ func updateEventMessage(s *discordgo.Session, event *types.War) {
 	}
 }
 
-func createWar(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database, territory, description string, scheduledAt *time.Time) {
+func createWar(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, territory, description string, scheduledAt *time.Time) {
 	war := types.War{
 		ID:          primitive.NewObjectID(),
 		Territory:   territory,
@@ -126,7 +128,7 @@ func createWar(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Da
 	war.MessageID = message.ID
 
 	ctx := context.Background()
-	_, err = db.Collection(types.WarsCollection).InsertOne(ctx, war)
+	_, err = db.Collection(globals.DB_PREFIX+types.WarsCollection).InsertOne(ctx, war)
 	if err != nil {
 		log.Fatalf("Cannot insert event: %v", err)
 	}
@@ -190,8 +192,8 @@ func isUserAlreadyInEvent(event *types.War, userID string) bool {
 	return false
 }
 
-func removeEvent(ctx context.Context, db types.Database, s *discordgo.Session, event *types.War) {
-	_, err := db.Collection(types.WarsCollection).DeleteOne(ctx, bson.M{"_id": event.ID})
+func removeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.War) {
+	_, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).DeleteOne(ctx, bson.M{"_id": event.ID})
 	if err != nil {
 		log.Fatalf("Cannot delete event: %v", err)
 	}
@@ -199,8 +201,8 @@ func removeEvent(ctx context.Context, db types.Database, s *discordgo.Session, e
 	_ = s.ChannelMessageDelete(WAR_CHANNEL_ID, event.MessageID)
 }
 
-func closeWar(ctx context.Context, db types.Database, s *discordgo.Session, event *types.War) {
-	_, err := db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"status": types.EventStatusClosed, "closed_at": time.Now()}})
+func closeWar(ctx context.Context, db database.Database, s *discordgo.Session, event *types.War) {
+	_, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"status": types.EventStatusClosed, "closed_at": time.Now()}})
 	if err != nil {
 		log.Fatalf("Cannot update event: %v", err)
 	}
@@ -208,8 +210,8 @@ func closeWar(ctx context.Context, db types.Database, s *discordgo.Session, even
 	_ = s.ChannelMessageDelete(WAR_CHANNEL_ID, event.MessageID)
 }
 
-func hasActiveWar(ctx context.Context, db types.Database) bool {
-	res := db.Collection(types.WarsCollection).FindOne(ctx, bson.M{"status": types.EventStatusOpen})
+func hasActiveWar(ctx context.Context, db database.Database) bool {
+	res := db.Collection(globals.DB_PREFIX+types.WarsCollection).FindOne(ctx, bson.M{"status": types.EventStatusOpen})
 	if res.Err() != nil {
 		return false
 	}
@@ -237,8 +239,8 @@ func getWarClassesOptions() []discordgo.SelectMenuOption {
 	return options
 }
 
-func getWarData(ctx context.Context, db types.Database, oid primitive.ObjectID) *types.War {
-	res := db.Collection(types.WarsCollection).FindOne(ctx, bson.M{
+func getWarData(ctx context.Context, db database.Database, oid primitive.ObjectID) *types.War {
+	res := db.Collection(globals.DB_PREFIX+types.WarsCollection).FindOne(ctx, bson.M{
 		"_id": oid,
 	})
 	if res.Err() != nil {
@@ -254,7 +256,7 @@ func getWarData(ctx context.Context, db types.Database, oid primitive.ObjectID) 
 	return &war
 }
 
-func sendReminderNotification(ctx context.Context, db types.Database, dg *discordgo.Session, war *types.War) {
+func sendReminderNotification(ctx context.Context, db database.Database, dg *discordgo.Session, war *types.War) {
 	now := GetCurrentTimeAsUTC()
 
 	fmt.Println("Sending notifications for war", war)
@@ -266,13 +268,13 @@ func sendReminderNotification(ctx context.Context, db types.Database, dg *discor
 		}
 	}(dg)
 
-	_, err := db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"notified_at": now}})
+	_, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"notified_at": now}})
 	if err != nil {
 		log.Fatalf("Cannot update war: %v", err)
 	}
 }
 
-func sendConfirmationRequest(ctx context.Context, db types.Database, dg *discordgo.Session, war *types.War, members []*discordgo.Member) {
+func sendConfirmationRequest(ctx context.Context, db database.Database, dg *discordgo.Session, war *types.War, members []*discordgo.Member) {
 	now := GetCurrentTimeAsUTC()
 
 	fmt.Println("Sending confirmation request for war", war)
@@ -284,7 +286,7 @@ func sendConfirmationRequest(ctx context.Context, db types.Database, dg *discord
 		}
 	}(dg)
 
-	_, err := db.Collection(types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"confirmed_at": now}})
+	_, err := db.Collection(globals.DB_PREFIX+types.WarsCollection).UpdateOne(ctx, bson.M{"_id": war.ID}, bson.M{"$set": bson.M{"confirmed_at": now}})
 	if err != nil {
 		log.Fatalf("Cannot update war: %v", err)
 	}

@@ -2,8 +2,9 @@ package discordutils
 
 import (
 	"fmt"
+	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/globals"
-	"nwmanager/types"
 	"slices"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate
 	})
 }
 
-func CreateHandler(guildID string, channelID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db types.Database), db types.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func CreateHandler(guildID string, channelID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database), db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		channel, err := s.Channel(i.ChannelID)
 		if err != nil {
@@ -207,4 +208,43 @@ func IsMember(member *discordgo.Member) bool {
 	}
 
 	return slices.Contains(member.Roles, globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
+}
+
+func RetrieveAllMembers(dg *discordgo.Session, GuildID string) map[string]*discordgo.Member {
+	var members = map[string]*discordgo.Member{}
+
+	mem, err := dg.GuildMembers(GuildID, "", 1000, discordgo.WithRetryOnRatelimit(true))
+	for len(mem) > 0 {
+		if err != nil {
+			log.Fatalf("Cannot get guild members: %v", err)
+		}
+		fmt.Println("Got", len(mem), "members")
+		for _, m := range mem {
+			members[m.User.ID] = m
+		}
+		mem, err = dg.GuildMembers(GuildID, mem[len(mem)-1].User.ID, 1000, discordgo.WithRetryOnRatelimit(true))
+	}
+
+	return members
+}
+
+func ClearChannel(s *discordgo.Session, channelID string) {
+	allMessages := []*discordgo.Message{}
+
+	messages, err := s.ChannelMessages(channelID, 100, "", "", "")
+	for len(messages) > 0 {
+		if err != nil {
+			log.Fatalf("Cannot get messages: %v", err)
+		}
+		fmt.Println("Cleared", len(messages), "messages")
+		allMessages = append(allMessages, messages...)
+		messages, err = s.ChannelMessages(channelID, 100, messages[len(messages)-1].ID, "", "")
+	}
+
+	for _, message := range allMessages {
+		err = s.ChannelMessageDelete(channelID, message.ID)
+		if err != nil {
+			log.Fatalf("Cannot delete message: %v", err)
+		}
+	}
 }

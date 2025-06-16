@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
@@ -16,19 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func routineRegisterNewPlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db types.Database) {
-	var members []*discordgo.Member
-
-	mem, err := dg.GuildMembers(*GuildID, "", 1000)
-	if err != nil {
-		log.Fatalf("Cannot get guild members: %v", err)
-	}
-	for len(mem) > 0 {
-		fmt.Println("Got", len(mem), "members")
-		members = append(members, mem...)
-		mem, err = dg.GuildMembers(*GuildID, mem[len(mem)-1].User.ID, 1000)
-	}
-
+func routineRegisterNewPlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db database.Database, members map[string]*discordgo.Member) {
 	channels, err := dg.GuildChannels(*GuildID)
 	if err != nil {
 		log.Fatalf("Cannot get guild channels: %v", err)
@@ -126,7 +115,7 @@ func routineRegisterNewPlayers(ctx context.Context, dg *discordgo.Session, Guild
 	}
 }
 
-func routineArchiveUnavailablePlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db types.Database) {
+func routineArchiveUnavailablePlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db database.Database, members map[string]*discordgo.Member) {
 	players, err := types.GetPlayers(ctx, db)
 	if err != nil {
 		log.Fatalf("Cannot get players: %v", err)
@@ -136,18 +125,31 @@ func routineArchiveUnavailablePlayers(ctx context.Context, dg *discordgo.Session
 		if player.ArchivedAt != nil {
 			continue
 		}
-		member, _ := dg.GuildMember(*GuildID, player.DiscordID)
+		member, err := dg.GuildMember(*GuildID, player.DiscordID, discordgo.WithRetryOnRatelimit(true))
+		if err != nil {
+			log.Println("Cannot get member", player.DiscordID, err)
+			if strings.Contains(err.Error(), "Unknown Member") {
+				processPlayerArchiving(ctx, dg, db, &player)
+			}
+			continue
+		}
+		if member == nil && members[player.DiscordID] != nil {
+			member = members[player.DiscordID]
+		}
+
 		if member == nil {
+			fmt.Println("Archived player due to missing member", player.IGN)
 			processPlayerArchiving(ctx, dg, db, &player)
 		} else {
 			if !discordutils.IsMember(member) {
+				fmt.Println("Archived player due to not being a member", player.IGN)
 				processPlayerArchiving(ctx, dg, db, &player)
 			}
 		}
 	}
 }
 
-func routineArchiveReturningPlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db types.Database) {
+func routineUnarchiveReturningPlayers(ctx context.Context, dg *discordgo.Session, GuildID *string, db database.Database, members map[string]*discordgo.Member) {
 	players, err := types.GetPlayers(ctx, db)
 	if err != nil {
 		log.Fatalf("Cannot get players: %v", err)
@@ -168,7 +170,7 @@ func routineArchiveReturningPlayers(ctx context.Context, dg *discordgo.Session, 
 	}
 }
 
-func routineDeleteArchivedPlayers(ctx context.Context, dg *discordgo.Session, db types.Database) {
+func routineDeleteArchivedPlayers(ctx context.Context, dg *discordgo.Session, db database.Database) {
 	players, err := types.GetArchivedPlayers(ctx, db)
 	if err != nil {
 		log.Fatalf("Cannot get archived players: %v", err)
@@ -186,7 +188,7 @@ func routineDeleteArchivedPlayers(ctx context.Context, dg *discordgo.Session, db
 	}
 }
 
-func routineExportPlayersCSV(ctx context.Context, db types.Database) {
+func routineExportPlayersCSV(ctx context.Context, db database.Database) {
 	players, err := types.GetActivePlayers(ctx, db)
 	if err != nil {
 		log.Fatalf("Cannot get players: %v", err)
