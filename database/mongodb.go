@@ -20,9 +20,6 @@ func NewMongoDB(ctx context.Context, url string) (Database, error) {
 	}
 
 	db := client.Database("nwmanager")
-	if err != nil {
-		panic(err)
-	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()

@@ -20,6 +20,11 @@ import (
 
 var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database){
 	"/evento": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+		if !canCreateEvent(i.Member) {
+			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			return
+		}
+
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -29,6 +34,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		EventsData[i.Member.User.ID] = &types.Event{
 			IsInviteOnly: false,
 			Owner:        i.Member.User.ID,
+			ChannelID:    i.ChannelID,
 		}
 		discordutils.SendInteractiveMessage(s, i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
 			discordgo.ActionsRow{
@@ -47,6 +53,11 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	},
 
 	"msg:create_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+		if !canCreateEvent(i.Member) {
+			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			return
+		}
+
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -56,6 +67,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		EventsData[i.Member.User.ID] = &types.Event{
 			IsInviteOnly: false,
 			Owner:        i.Member.User.ID,
+			ChannelID:    i.ChannelID,
 		}
 
 		discordutils.SendInteractiveMessage(s, i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
@@ -75,6 +87,11 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	},
 
 	"msg:create_closed_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+		if !canCreateEvent(i.Member) {
+			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			return
+		}
+
 		ctx := context.Background()
 		if ownerHasEvent(ctx, db, i.Member.User) {
 			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
@@ -102,6 +119,11 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	},
 
 	"/encerrar": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+		if !canCreateEvent(i.Member) {
+			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para encerrar eventos.", 5*time.Second)
+			return
+		}
+
 		ctx := context.Background()
 		res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"owner": i.Member.User.ID, "status": types.EventStatusOpen})
 		if res.Err() != nil {
@@ -251,7 +273,6 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	"msg:approve_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "approve_")
 		parts := strings.Split(id, "_")
-		fmt.Println(parts)
 		if len(parts) != 3 {
 			return
 		}
@@ -367,8 +388,8 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 				}
 				scheduledAt = &d
 			}
-			go createEvent(s, i, db, v.Type, title, description, scheduledAt, v.IsInviteOnly)
-			discordutils.ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", EVENTS_CHANNEL_ID), 5*time.Second)
+			go createEvent(s, i, db, v.Type, v.ChannelID, title, description, scheduledAt, v.IsInviteOnly)
+			discordutils.ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", v.ChannelID), 5*time.Second)
 		}
 		delete(EventsData, i.Member.User.ID)
 	},
@@ -378,7 +399,7 @@ var EventsData = map[string]*types.Event{}
 
 func HandleMessages(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
-		if GuildID != i.GuildID || i.ChannelID != EVENTS_CHANNEL_ID {
+		if GuildID != i.GuildID || !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
 			return
 		}
 
@@ -386,19 +407,16 @@ func HandleMessages(GuildID string, s *discordgo.Session, db database.Database) 
 			return
 		}
 
-		if i.ChannelID == EVENTS_CHANNEL_ID {
-			_ = s.ChannelMessageDelete(i.ChannelID, i.ID)
-		}
+		_ = s.ChannelMessageDelete(i.ChannelID, i.ID)
 	}
 }
 
 func HandleEventClose(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if GuildID != i.GuildID || i.ChannelID != EVENTS_CHANNEL_ID {
+		if GuildID != i.GuildID || !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
 			return
 		}
 		if i.Type == discordgo.InteractionMessageComponent {
-			fmt.Println("msg", i.MessageComponentData().CustomID)
 			if strings.HasPrefix(i.MessageComponentData().CustomID, "close_event_") {
 				handleEventClose(s, i, db)
 				return
@@ -586,98 +604,15 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db da
 	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ATUALIZADO.**", 5*time.Second)
 }
 
-// func HandleReactionAdd(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, reaction *discordgo.MessageReactionAdd) {
-// 	return func(s *discordgo.Session, i *discordgo.MessageReactionAdd) {
-// 		if GuildID != i.GuildID {
-// 			return
-// 		}
-
-// 		if i.ChannelID != EVENTS_CHANNEL_ID || i.UserID == s.State.User.ID {
-// 			return
-// 		}
-
-// 		_ = s.MessageReactionRemove(i.ChannelID, i.MessageID, i.Emoji.Name, i.UserID)
-
-// 		ctx := context.Background()
-// 		res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"message_id": i.MessageID})
-// 		if res.Err() != nil {
-// 			return
-// 		}
-
-// 		var event types.Event
-// 		err := res.Decode(&event)
-// 		if err != nil {
-// 			log.Fatalf("Cannot decode event: %v", err)
-// 		}
-
-// 		isPlayerInEvent := isUserAlreadyInEvent(&event, i.UserID)
-// 		if i.Emoji.Name == "❌" && isPlayerInEvent {
-// 			removePlayerFromEvent(i.Member.User, db, &event)
-// 			updateEventMessage(s, &event)
-// 			return
-// 		}
-
-// 		if isPlayerInEvent {
-// 			return
-// 		}
-
-// 		role := resolveEventSlotFromEmoji(i.Emoji.Name)
-// 		if role == EventSlotAny {
-// 			return
-// 		}
-
-// 		if event.Status != types.EventStatusOpen {
-// 			return
-// 		}
-
-// 		if event.IsInviteOnly {
-// 			msg, err := discordutils.SendMemberDM(s, event.Owner, fmt.Sprintf("O jogador **%s** tentou se inscrever no evento **%s**. Clique em ✅ para aceitar ou ❌ para recusar.", i.Member.User.Mention(), event.Title))
-// 			if err != nil {
-// 				return
-// 			}
-
-// 			_ = s.MessageReactionAdd(msg.ChannelID, msg.ID, "✅")
-// 			_ = s.MessageReactionAdd(msg.ChannelID, msg.ID, "❌")
-
-// 			discordutils.SendMemberDM(s, i.Member.User.ID, fmt.Sprintf("Você tentou se inscrever no evento %s. Aguarde a aprovação do organizador.", event.Title))
-// 			return
-// 		}
-
-// 		if EventSlots[event.Type] != "" {
-// 			freeSlots := getEventFreeSlotsByRole(&event, role)
-// 			if len(freeSlots) == 0 {
-// 				return
-// 			}
-
-// 			slot := freeSlots[0]
-// 			event.PlayerSlots[slot] = i.UserID
-
-// 			remainingSlots := getEventFreeSlots(&event)
-// 			if len(remainingSlots) == 0 {
-// 				event.Status = types.EventStatusCompleted
-// 				event.CompletedAt = Some(time.Now())
-// 			}
-// 		} else {
-// 			event.PlayerSlots = append(event.PlayerSlots, i.UserID)
-// 		}
-
-// 		_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
-// 		if err != nil {
-// 			return
-// 		}
-
-// 		updateEventMessage(s, &event)
-// 	}
-// }
-
 func setupEventsChannel(
 	ctx context.Context,
 	dg *discordgo.Session,
 	db database.Database,
 	everyoneRole string,
 	memberRole string,
+	channel_id string,
 ) *discordgo.Channel {
-	events_channel, err := dg.Channel(EVENTS_CHANNEL_ID)
+	events_channel, err := dg.Channel(channel_id)
 	if err != nil {
 		log.Fatalf("Cannot get events channel: %v", err)
 	}
@@ -704,35 +639,37 @@ func setupEventsChannel(
 	// 	log.Fatalf("Cannot edit welcome channel: %v", err)
 	// }
 
-	discordutils.ClearChannel(dg, EVENTS_CHANNEL_ID)
+	discordutils.ClearChannel(dg, channel_id)
 
-	_, err = dg.ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
-		Embed: &discordgo.MessageEmbed{
-			Title:       "Eventos Ativos",
-			Description: EVENTS_CHANNEL_INIT_MESSAGE,
-			Color:       0xcccccc,
-		},
-		Components: []discordgo.MessageComponent{
-			&discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					&discordgo.Button{
-						Label:    "Novo Evento",
-						Style:    discordgo.PrimaryButton,
-						Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
-						CustomID: "create_event",
-					},
-					&discordgo.Button{
-						Label:    "Novo Evento Fechado",
-						Style:    discordgo.SecondaryButton,
-						Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
-						CustomID: "create_closed_event",
+	if EVENTS_GUIDE_MESSAGE {
+		_, err = dg.ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
+			Embed: &discordgo.MessageEmbed{
+				Title:       "Eventos Ativos",
+				Description: EVENTS_CHANNEL_INIT_MESSAGE,
+				Color:       0xcccccc,
+			},
+			Components: []discordgo.MessageComponent{
+				&discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						&discordgo.Button{
+							Label:    "Novo Evento",
+							Style:    discordgo.PrimaryButton,
+							Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
+							CustomID: "create_event",
+						},
+						&discordgo.Button{
+							Label:    "Novo Evento Fechado",
+							Style:    discordgo.SecondaryButton,
+							Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+							CustomID: "create_closed_event",
+						},
 					},
 				},
 			},
-		},
-	})
-	if err != nil {
-		log.Fatalf("Cannot send setup message: %v", err)
+		})
+		if err != nil {
+			log.Fatalf("Cannot send setup message: %v", err)
+		}
 	}
 
 	// Query all events

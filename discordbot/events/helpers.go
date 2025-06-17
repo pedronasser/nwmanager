@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"nwmanager/database"
+	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
+	"slices"
 	"time"
 
 	. "nwmanager/helpers"
@@ -153,7 +155,7 @@ func removePlayerFromEvent(userId string, db database.Database, event *types.Eve
 		return
 	}
 
-	if EventRoles[event.Type] != "" {
+	if EventSlots[event.Type] != "" {
 		event.PlayerSlots[foundIndex] = ""
 	} else {
 		event.PlayerSlots = append(event.PlayerSlots[:foundIndex], event.PlayerSlots[foundIndex+1:]...)
@@ -200,7 +202,7 @@ func updateEventPlayerRole(u *discordgo.User, db database.Database, event *types
 }
 
 func updateEventMessage(s *discordgo.Session, event *types.Event) {
-	events_channel, err := s.Channel(EVENTS_CHANNEL_ID)
+	events_channel, err := s.Channel(event.ChannelID)
 	if err != nil {
 		log.Fatalf("Cannot get events channel: %v", err)
 	}
@@ -216,7 +218,7 @@ func updateEventMessage(s *discordgo.Session, event *types.Event) {
 	}
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, tipo types.EventType, title, description string, scheduledAt *time.Time, isInviteOnly bool) {
+func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) {
 	event := types.Event{
 		ID:           primitive.NewObjectID(),
 		Title:        title,
@@ -228,6 +230,7 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db databa
 		PlayerSlots:  []string{},
 		ScheduledAt:  scheduledAt,
 		IsInviteOnly: isInviteOnly,
+		ChannelID:    channel_id,
 	}
 
 	if EventSlots[event.Type] != "" {
@@ -238,7 +241,7 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db databa
 		event.PlayerSlots = []string{i.Interaction.Member.User.ID}
 	}
 
-	events_channel, err := s.Channel(EVENTS_CHANNEL_ID)
+	events_channel, err := s.Channel(event.ChannelID)
 	if err != nil {
 		log.Fatalf("Cannot get events channel: %v", err)
 	}
@@ -280,7 +283,7 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 		btnLength++
 	}
 
-	if EventRoles[event.Type] == "" {
+	if EventSlots[event.Type] == "" {
 		joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
 			Label:    "Entrar",
 			Style:    discordgo.SecondaryButton,
@@ -345,12 +348,7 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 }
 
 func isUserAlreadyInEvent(event *types.Event, userID string) bool {
-	for _, player := range event.PlayerSlots {
-		if player == userID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(event.PlayerSlots, userID)
 }
 
 func removeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) {
@@ -359,7 +357,7 @@ func removeEvent(ctx context.Context, db database.Database, s *discordgo.Session
 		log.Fatalf("Cannot delete event: %v", err)
 	}
 
-	_ = s.ChannelMessageDelete(EVENTS_CHANNEL_ID, event.MessageID)
+	_ = s.ChannelMessageDelete(event.ChannelID, event.MessageID)
 }
 
 func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) {
@@ -368,7 +366,7 @@ func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session,
 		log.Fatalf("Cannot update event: %v", err)
 	}
 
-	_ = s.ChannelMessageDelete(EVENTS_CHANNEL_ID, event.MessageID)
+	_ = s.ChannelMessageDelete(event.ChannelID, event.MessageID)
 }
 
 func ownerHasEvent(ctx context.Context, db database.Database, owner *discordgo.User) bool {
@@ -439,4 +437,12 @@ func sendJoinRequest(
 	}
 
 	return nil
+}
+
+func canCreateEvent(member *discordgo.Member) bool {
+	if EVENTS_REQUIRE_ADMIN && !discordutils.IsMemberAdmin(member) {
+		return false
+	}
+
+	return true
 }

@@ -8,6 +8,7 @@ import (
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"os"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -17,26 +18,20 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 	fmt.Println("Loading events")
 
 	_ = godotenv.Load()
-	EVENTS_CHANNEL_ID = os.Getenv("EVENTS_CHANNEL_ID")
-	if EVENTS_CHANNEL_NAME != "" {
-		channels, err := dg.GuildChannels(*GuildID)
-		if err != nil {
-			log.Fatalf("Cannot get guild channels: %v", err)
-		}
-		for _, channel := range channels {
-			if channel.Name == EVENTS_CHANNEL_NAME {
-				EVENTS_CHANNEL_ID = channel.ID
-				break
-			}
-		}
-	}
-
-	if EVENTS_CHANNEL_ID == "" {
-		fmt.Println("EVENTS_CHANNEL_ID is not set")
+	EVENTS_CHANNEL_IDS = strings.Split(os.Getenv("EVENTS_CHANNEL_IDS"), ",")
+	if len(EVENTS_CHANNEL_IDS) == 0 {
+		fmt.Println("EVENTS_CHANNEL_IDS is not set")
 		os.Exit(1)
 	}
 
-	_ = setupEventsChannel(ctx, dg, db, globals.ACCESS_ROLE_IDS[globals.EVERYONE_ROLE_NAME], globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
+	if os.Getenv("EVENTS_REQUIRE_ADMIN") != "" {
+		EVENTS_REQUIRE_ADMIN = true
+	}
+
+	for _, channel_id := range EVENTS_CHANNEL_IDS {
+		_ = setupEventsChannel(ctx, dg, db, globals.ACCESS_ROLE_IDS[globals.EVERYONE_ROLE_NAME], globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME], channel_id)
+		dg.AddHandler(discordutils.CreateHandler(*GuildID, channel_id, handlers, db))
+	}
 
 	_, err := dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
 		Name:        "evento",
@@ -54,7 +49,6 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		log.Fatalf("Cannot create slash command: %v", err)
 	}
 
-	dg.AddHandler(discordutils.CreateHandler(*GuildID, EVENTS_CHANNEL_ID, handlers, db))
 	// dg.AddHandler(HandleReactionAdd(*GuildID, dg, db))
 	dg.AddHandler(HandleMessages(*GuildID, dg, db))
 	dg.AddHandler(HandleEventClose(*GuildID, dg, db))

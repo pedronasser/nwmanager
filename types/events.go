@@ -45,6 +45,7 @@ const (
 // Event
 type Event struct {
 	ID           primitive.ObjectID `bson:"_id" json:"id"`
+	ChannelID    string             `bson:"channel_id" json:"channel_id"`
 	IsInviteOnly bool               `bson:"is_invite_only" json:"is_invite_only"`
 	Title        string             `bson:"title" json:"title"`
 	Description  string             `bson:"description" json:"description"`

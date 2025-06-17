@@ -2,7 +2,6 @@ package events
 
 import (
 	"fmt"
-	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"slices"
@@ -11,11 +10,13 @@ import (
 )
 
 var (
-	EVENTS_CHANNEL_ID = ""
+	EVENTS_CHANNEL_IDS   = []string{}
+	EVENTS_REQUIRE_ADMIN = false
+	EVENTS_GUIDE_MESSAGE = true
+	EVENTS_CHANNEL_NAME  = ""
 )
 
 const (
-	EVENTS_CHANNEL_NAME         = "🟢・eventos"
 	EVENTS_CHANNEL_INIT_MESSAGE = "**Clique no botão abaixo** ou **envie /evento** para criar um evento.\n\nPara encerrar um evento, **clique no botão de encerrar**x."
 )
 
@@ -42,7 +43,6 @@ var EventSlotsCount = map[types.EventType]int{
 	types.EventTypeRaidDevour:    20,
 	types.EventTypeOPR:           5,
 	types.EventTypeArena:         3,
-	types.EventTypeInfluenceRace: -1,
 }
 
 const (
@@ -64,7 +64,7 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonM1:     "THDDD",
 	types.EventTypeDungeonM2:     "THDDD",
 	types.EventTypeDungeonM3:     "THDDD",
-	types.EventTypeRaidGorgon:    "TH1DD HDDDD",
+	types.EventTypeRaidGorgon:    "THDDD HDDDD",
 	types.EventTypeRaidDevour:    "T5HFS 12223 12224 RPPPP",
 	types.EventTypeOPR:           "THDDD",
 	types.EventTypeArena:         "",
@@ -72,14 +72,56 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeLootRoute:     "",
 }
 
-// Event roles
-var EventRoles = map[types.EventType]string{
-	types.EventTypeOPR:        globals.OPR_ROLE_NAME,
-	types.EventTypeRaidDevour: globals.RAID_DEVOUR_ROLE,
-	types.EventTypeRaidGorgon: globals.RAID_GORGON_ROLE,
+type EventSlotRole rune
+
+const (
+	EventSlotTank         EventSlotRole = 'T'
+	EventSlotDPS          EventSlotRole = 'D'
+	EventSlotAny          EventSlotRole = 'A'
+	EventSlotHeal         EventSlotRole = 'H'
+	EventSlotRangedTank   EventSlotRole = '0' // Ranged Tank
+	EventSlotDPSBlood     EventSlotRole = '1' // Rapier Blood
+	EventSlotDPSEvade     EventSlotRole = '2' // Rapier Evade
+	EventSlotDPSSpear     EventSlotRole = '3' // Lança
+	EventSlotDPSSerenity  EventSlotRole = '4' // Serenidade
+	EventSlotDPSFire      EventSlotRole = '5' // Fire DPS
+	EventSlotDPSRendBot   EventSlotRole = 'R' // Rend Bot
+	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
+	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
+	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
+)
+
+var EventSlotRoleName = map[EventSlotRole]string{
+	EventSlotTank:         "Tank",
+	EventSlotDPS:          "DPS",
+	EventSlotHeal:         "Heal",
+	EventSlotRangedTank:   "R. Tank",
+	EventSlotDPSBlood:     "R. Blood",
+	EventSlotDPSEvade:     "R. Evade",
+	EventSlotDPSSpear:     "Lança",
+	EventSlotDPSFire:      "Fire DPS",
+	EventSlotDPSSerenity:  "Serenity",
+	EventSlotDPSRendBot:   "Rend Bot",
+	EventSlotDPSSnS:       "SnS DPS",
+	EventSlotDPSPadLight:  "Pad",
+	EventSlotSupportFlail: "Flail",
 }
 
-var EventRoleIDs = map[types.EventType]string{}
+var EventSlotRoleEmoji = map[EventSlotRole]string{
+	EventSlotTank:         "🔰",
+	EventSlotDPS:          "⚔️",
+	EventSlotHeal:         "🌿",
+	EventSlotRangedTank:   "🎯",
+	EventSlotDPSBlood:     "🩸",
+	EventSlotDPSEvade:     "⚡",
+	EventSlotDPSSpear:     "⚜️",
+	EventSlotDPSRendBot:   "🤖",
+	EventSlotDPSSerenity:  "🗡",
+	EventSlotDPSSnS:       "🛡️",
+	EventSlotDPSFire:      "🔥",
+	EventSlotDPSPadLight:  "💡",
+	EventSlotSupportFlail: "🌀",
+}
 
 var EventTypeEmojis = map[types.EventType]string{
 	types.EventTypeDungeonNormal: EventTypeEmojiDungeonNormal,
@@ -194,57 +236,6 @@ func getEventTypeName(eventType types.EventType) string {
 	}
 
 	return ""
-}
-
-type EventSlotRole rune
-
-const (
-	EventSlotTank         EventSlotRole = 'T'
-	EventSlotDPS          EventSlotRole = 'D'
-	EventSlotAny          EventSlotRole = 'A'
-	EventSlotHeal         EventSlotRole = 'H'
-	EventSlotRangedTank   EventSlotRole = '0' // Ranged Tank
-	EventSlotDPSBleed     EventSlotRole = '1' // Rapier Blood
-	EventSlotDPSEvade     EventSlotRole = '2' // Rapier Evade
-	EventSlotDPSSpear     EventSlotRole = '3' // Lança
-	EventSlotDPSSerenity  EventSlotRole = '4' // Serenidade
-	EventSlotDPSFire      EventSlotRole = '5' // Fire DPS
-	EventSlotDPSRendBot   EventSlotRole = 'R' // Rend Bot
-	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
-	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
-	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
-)
-
-var EventSlotRoleName = map[EventSlotRole]string{
-	EventSlotTank:         "Tank",
-	EventSlotDPS:          "DPS",
-	EventSlotHeal:         "Heal",
-	EventSlotRangedTank:   "R. Tank",
-	EventSlotDPSBleed:     "R. Blood",
-	EventSlotDPSEvade:     "R. Evade",
-	EventSlotDPSSpear:     "Lança",
-	EventSlotDPSFire:      "Fire DPS",
-	EventSlotDPSSerenity:  "Serenity",
-	EventSlotDPSRendBot:   "Rend Bot",
-	EventSlotDPSSnS:       "SnS DPS",
-	EventSlotDPSPadLight:  "Pad",
-	EventSlotSupportFlail: "Flail",
-}
-
-var EventSlotRoleEmoji = map[EventSlotRole]string{
-	EventSlotTank:         "🔰",
-	EventSlotDPS:          "⚔️",
-	EventSlotHeal:         "🌿",
-	EventSlotRangedTank:   "🎯",
-	EventSlotDPSBleed:     "🩸",
-	EventSlotDPSEvade:     "⚡",
-	EventSlotDPSSpear:     "⚜️",
-	EventSlotDPSRendBot:   "🤖",
-	EventSlotDPSSerenity:  "🗡",
-	EventSlotDPSSnS:       "🛡️",
-	EventSlotDPSFire:      "🔥",
-	EventSlotDPSPadLight:  "💡",
-	EventSlotSupportFlail: "🌀",
 }
 
 func getEventSlotCount(eventType types.EventType) int {
@@ -375,18 +366,6 @@ func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int
 	}
 
 	return freeSlots
-}
-
-func getEventRoleID(guild *discordgo.Guild, event *types.Event) string {
-	if roleName, ok := EventRoles[event.Type]; ok {
-		role := discordutils.GetRoleByName(guild, roleName)
-		if role == nil {
-			return ""
-		}
-		return role.ID
-	}
-
-	return ""
 }
 
 func getEventSlotTypes(event *types.Event) []EventSlotRole {

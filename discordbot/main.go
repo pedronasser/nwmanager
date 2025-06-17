@@ -12,6 +12,7 @@ import (
 	"nwmanager/discordbot/web"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -59,8 +60,6 @@ func main() {
 		log.Fatalf("Cannot add guild to state: %v", err)
 	}
 
-	fmt.Println(shouldLoadModule("management"))
-
 	db, err := database.NewMongoDB(ctx, os.Getenv("MONGO_URI"))
 	if err != nil {
 		log.Fatalf("failed to create database: %v", err)
@@ -82,7 +81,19 @@ func main() {
 
 	// Just like the ping pong example, we only care about receiving message
 	// events in this example.
-	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildVoiceStates
+	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildVoiceStates | discordgo.IntentGuilds
+
+	// dg.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+	// 	for _, guild := range r.Guilds {
+	// 		// fmt.Println("Connected to guild:", guild.Name, "with ID:", guild.ID)
+	// 		guild, err := dg.Guild(guild.ID) // Ensure the guild is cached
+	// 		if err != nil {
+	// 			log.Printf("Error fetching guild %s: %v", guild.ID, err)
+	// 			continue
+	// 		}
+	// 		fmt.Printf("Guild Name: %s, ID: %s, Member Count: %d\n", guild.Name, guild.ID, guild.MemberCount)
+	// 	}
+	// })
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -113,11 +124,5 @@ func shouldLoadModule(m string) bool {
 
 	var modules []string = strings.Split(modulesEnv, ",")
 
-	for _, module := range modules {
-		if module == m {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(modules, m)
 }
