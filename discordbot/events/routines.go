@@ -43,7 +43,11 @@ func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 			}
 
 			if event.Status == types.EventStatusCompleted && event.CompletedAt.Add(EVENT_COMPLETE_EXPIRE_DURATION).Before(now) {
-				closeEvent(ctx, db, dg, &event)
+				err := closeEvent(ctx, db, dg, &event)
+				if err != nil {
+					log.Printf("Could not close event: %v", err)
+					continue
+				}
 				fmt.Println("Event closed", event.ID, "completion", *event.CompletedAt, now)
 				continue
 			}
@@ -69,11 +73,11 @@ func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 					continue
 				}
 
-				// if event.ScheduledAt.Add(EVENT_COMPLETE_EXPIRE_DURATION).Before(now) {
-				// 	closeEvent(ctx, db, dg, &event)
-				// 	fmt.Println("Event closed", event.ID, "schedule date", *event.ScheduledAt, now)
-				// 	continue
-				// }
+				if event.ScheduledAt.Add(EVENT_MAX_DURATION + EVENT_COMPLETE_EXPIRE_DURATION).Before(now) {
+					closeEvent(ctx, db, dg, &event)
+					fmt.Println("Event closed", event.ID, "schedule date", *event.ScheduledAt, now)
+					continue
+				}
 			}
 		}
 	}

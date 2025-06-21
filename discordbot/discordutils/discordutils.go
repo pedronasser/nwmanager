@@ -2,8 +2,8 @@ package discordutils
 
 import (
 	"fmt"
-	"log"
 	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/globals"
 	"slices"
 	"strings"
@@ -109,7 +109,7 @@ func GetRoleByName(guild *discordgo.Guild, roleName string) *discordgo.Role {
 	return nil
 }
 
-func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string, destroyDelay time.Duration) {
+func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string, destroyDelay time.Duration) error {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -119,28 +119,30 @@ func ReplyEphemeralMessage(s *discordgo.Session, i *discordgo.InteractionCreate,
 	})
 
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to send ephemeral message: %w", err)
 	}
 
 	if destroyDelay > 0 {
 		time.Sleep(destroyDelay)
+
+		err = s.InteractionResponseDelete(i.Interaction)
+		if err != nil {
+			return fmt.Errorf("failed to delete ephemeral message: %w", err)
+		}
 	}
 
-	err = s.InteractionResponseDelete(i.Interaction)
-	if err != nil {
-		panic(err)
-	}
+	return nil
 }
 
 func SendMemberDM(s *discordgo.Session, userID string, content string) (*discordgo.Message, error) {
 	channel, err := s.UserChannelCreate(userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create DM channel: %w", err)
 	}
 
 	msg, err := s.ChannelMessageSend(channel.ID, content)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send DM message: %w", err)
 	}
 
 	return msg, nil
@@ -157,11 +159,8 @@ func GetGuildMembers(s *discordgo.Session, guildID string, memberRoleID string) 
 
 		actualMembers := []*discordgo.Member{}
 		for _, member := range chunk {
-			for _, role := range member.Roles {
-				if role == memberRoleID {
-					actualMembers = append(actualMembers, member)
-					break
-				}
+			if slices.Contains(member.Roles, memberRoleID) {
+				actualMembers = append(actualMembers, member)
 			}
 		}
 
@@ -210,13 +209,13 @@ func IsMember(member *discordgo.Member) bool {
 	return slices.Contains(member.Roles, globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
 }
 
-func RetrieveAllMembers(dg *discordgo.Session, GuildID string) map[string]*discordgo.Member {
+func RetrieveAllMembers(dg *discordgo.Session, GuildID string) (map[string]*discordgo.Member, error) {
 	var members = map[string]*discordgo.Member{}
 
 	mem, err := dg.GuildMembers(GuildID, "", 1000, discordgo.WithRetryOnRatelimit(true))
 	for len(mem) > 0 {
 		if err != nil {
-			log.Fatalf("Cannot get guild members: %v", err)
+			return members, fmt.Errorf("Cannot get guild members: %v", err)
 		}
 		fmt.Println("Got", len(mem), "members")
 		for _, m := range mem {
@@ -225,18 +224,17 @@ func RetrieveAllMembers(dg *discordgo.Session, GuildID string) map[string]*disco
 		mem, err = dg.GuildMembers(GuildID, mem[len(mem)-1].User.ID, 1000, discordgo.WithRetryOnRatelimit(true))
 	}
 
-	return members
+	return members, nil
 }
 
-func ClearChannel(s *discordgo.Session, channelID string) {
+func ClearChannel(s *discordgo.Session, channelID string) error {
 	allMessages := []*discordgo.Message{}
 
 	messages, err := s.ChannelMessages(channelID, 100, "", "", "")
 	for len(messages) > 0 {
 		if err != nil {
-			log.Fatalf("Cannot get messages: %v", err)
+			return fmt.Errorf("Cannot get messages: %v", err)
 		}
-		fmt.Println("Cleared", len(messages), "messages")
 		allMessages = append(allMessages, messages...)
 		messages, err = s.ChannelMessages(channelID, 100, messages[len(messages)-1].ID, "", "")
 	}
@@ -244,7 +242,21 @@ func ClearChannel(s *discordgo.Session, channelID string) {
 	for _, message := range allMessages {
 		err = s.ChannelMessageDelete(channelID, message.ID)
 		if err != nil {
-			log.Fatalf("Cannot delete message: %v", err)
+			return fmt.Errorf("Cannot delete message: %v", err)
 		}
 	}
+
+	return nil
+}
+
+func CreateSelectMenus(options ...common.EventSelectorOption) []discordgo.SelectMenuOption {
+	selectMenus := make([]discordgo.SelectMenuOption, 0, len(options))
+	for _, option := range options {
+		selectMenus = append(selectMenus, discordgo.SelectMenuOption{
+			Label: option.Label,
+			Value: option.Value,
+			Emoji: &discordgo.ComponentEmoji{Name: option.Emoji},
+		})
+	}
+	return selectMenus
 }

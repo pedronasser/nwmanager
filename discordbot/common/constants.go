@@ -1,8 +1,6 @@
-package constants
+package common
 
 const (
-	GUILD_TITLE = "CLAVE"
-
 	WEAPON_SWORD_SHIELD     = "sword_shield"
 	WEAPON_TWO_HANDED_SWORD = "two_handed_sword"
 	WEAPON_BOW              = "bow"

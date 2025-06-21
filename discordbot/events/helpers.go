@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
@@ -201,24 +200,26 @@ func updateEventPlayerRole(u *discordgo.User, db database.Database, event *types
 	return nil
 }
 
-func updateEventMessage(s *discordgo.Session, event *types.Event) {
+func updateEventMessage(s *discordgo.Session, event *types.Event) error {
 	events_channel, err := s.Channel(event.ChannelID)
 	if err != nil {
-		log.Fatalf("Cannot get events channel: %v", err)
+		return fmt.Errorf("Cannot get events channel: %v", err)
 	}
 
 	message, err := s.ChannelMessage(events_channel.ID, event.MessageID)
 	if err != nil {
-		log.Fatalf("Cannot get message: %v", err)
+		return fmt.Errorf("Cannot get event message: %v", err)
 	}
 
 	_, err = s.ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(event))
 	if err != nil {
-		log.Fatalf("Cannot edit message: %v", err)
+		return fmt.Errorf("Cannot edit event message: %v", err)
 	}
+
+	return nil
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) {
+func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) error {
 	event := types.Event{
 		ID:           primitive.NewObjectID(),
 		Title:        title,
@@ -243,21 +244,26 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db databa
 
 	events_channel, err := s.Channel(event.ChannelID)
 	if err != nil {
-		log.Fatalf("Cannot get events channel: %v", err)
+		return fmt.Errorf("Cannot get events channel: %v", err)
 	}
 
-	message := createEventMessage(s, events_channel, &event)
+	message, err := createEventMessage(s, events_channel, &event)
+	if err != nil {
+		return fmt.Errorf("Cannot create event message: %v", err)
+	}
+
 	event.MessageID = message.ID
 
 	ctx := context.Background()
 	_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).InsertOne(ctx, event)
 	if err != nil {
-		log.Fatalf("Cannot insert event: %v", err)
+		return fmt.Errorf("Cannot insert event into database: %v", err)
 	}
+
+	return nil
 }
 
-func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) *discordgo.Message {
-
+func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) (*discordgo.Message, error) {
 	components := []discordgo.MessageComponent{}
 
 	joinActionsRow := discordgo.ActionsRow{
@@ -322,51 +328,70 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 		},
 	)
 
+	eventMessage := buildEventMessage(event)
 	message, err := dg.ChannelMessageSendComplex(events_channel.ID,
 		&discordgo.MessageSend{
-			Embed:      buildEventMessage(event),
+			Embed:      eventMessage,
 			Components: components,
 		},
 	)
 	if err != nil {
-		log.Fatalf("Cannot send event message: %v", err)
+		return nil, fmt.Errorf("Cannot send event message: %v", err)
 	}
 
-	// for _, slot := range getEventSlotTypes(event) {
-	// 	err = dg.MessageReactionAdd(events_channel.ID, message.ID, EventSlotRoleEmoji[slot])
-	// 	if err != nil {
-	// 		log.Fatalf("Cannot add reaction to message: %v", err)
-	// 	}
-	// }
+	thread_channel, err := dg.MessageThreadStartComplex(events_channel.ID, message.ID, &discordgo.ThreadStart{
+		Name: eventMessage.Title,
+		Type: discordgo.ChannelTypeGuildPublicThread,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Cannot create thread for event: %v", err)
+	}
 
-	// err = dg.MessageReactionAdd(events_channel.ID, message.ID, "❌")
-	// if err != nil {
-	// 	log.Fatalf("Cannot add reaction to message: %v", err)
-	// }
+	_, err = dg.ChannelMessageSend(thread_channel.ID, fmt.Sprintf("Este é o canal de discussão do evento **%s**. Aqui você pode conversar com os participantes e tirar dúvidas.", eventMessage.Title))
+	if err != nil {
+		return nil, fmt.Errorf("Cannot send thread message: %v", err)
+	}
 
-	return message
+	return message, nil
 }
 
 func isUserAlreadyInEvent(event *types.Event, userID string) bool {
 	return slices.Contains(event.PlayerSlots, userID)
 }
 
-func removeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) {
-	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).DeleteOne(ctx, bson.M{"_id": event.ID})
+func removeEventMessage(dg *discordgo.Session, event *types.Event) error {
+	msg, err := dg.ChannelMessage(event.ChannelID, event.MessageID)
 	if err != nil {
-		log.Fatalf("Cannot delete event: %v", err)
+		return fmt.Errorf("Cannot get event message: %v", err)
 	}
 
-	_ = s.ChannelMessageDelete(event.ChannelID, event.MessageID)
+	if msg.Thread != nil {
+		_, err = dg.ChannelDelete(msg.Thread.ID)
+		if err != nil {
+			return fmt.Errorf("Cannot delete event thread: %v", err)
+		}
+	}
+
+	err = dg.ChannelMessageDelete(event.ChannelID, event.MessageID)
+	if err != nil {
+		return fmt.Errorf("Cannot delete event message: %v", err)
+	}
+
+	return nil
 }
 
-func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) {
+func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) error {
 	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"status": types.EventStatusClosed, "closed_at": time.Now()}})
 	if err != nil {
-		log.Fatalf("Cannot update event: %v", err)
+		return fmt.Errorf("Cannot close event: %v", err)
 	}
 
-	_ = s.ChannelMessageDelete(event.ChannelID, event.MessageID)
+	err = removeEventMessage(s, event)
+	if err != nil {
+		return fmt.Errorf("Cannot remove event: %v", err)
+	}
+
+	return nil
 }
 
 func ownerHasEvent(ctx context.Context, db database.Database, owner *discordgo.User) bool {
@@ -394,8 +419,6 @@ func getEventTitle(event *types.Event) string {
 }
 
 func sendJoinRequest(
-	ctx context.Context,
-	db database.Database,
 	s *discordgo.Session,
 	event *types.Event,
 	user *discordgo.User,

@@ -37,7 +37,11 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			members := discordutils.RetrieveAllMembers(dg, *GuildID)
+			members, err := discordutils.RetrieveAllMembers(dg, *GuildID)
+			if err != nil {
+				fmt.Printf("Error retrieving members: %v\n", err)
+				continue
+			}
 			routineRegisterNewPlayers(ctx, dg, GuildID, db, members)
 			routineArchiveUnavailablePlayers(ctx, dg, GuildID, db, members)
 			routineUnarchiveReturningPlayers(ctx, dg, GuildID, db, members)

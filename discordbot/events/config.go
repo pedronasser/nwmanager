@@ -2,12 +2,56 @@ package events
 
 import (
 	"fmt"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"slices"
-
-	"github.com/bwmarrin/discordgo"
 )
+
+type Config struct {
+	ChannelIDs   []string `json:"channel_ids"`
+	RequireAdmin bool     `json:"require_admin"`
+	GuideMessage bool     `json:"guide_message"`
+	ChannelName  string   `json:"channel_name"`
+	InitMessage  string   `json:"init_message"`
+
+	EventTypeEmojis    map[types.EventType]string   `json:"event_type_emojis"`
+	EventSlots         map[types.EventType]string   `json:"event_slots"`
+	EventSlotsCount    map[types.EventType]int      `json:"event_slots_count"`
+	EventSlotRoleName  map[EventSlotRole]string     `json:"event_slot_role_name"`
+	EventSlotRoleEmoji map[EventSlotRole]string     `json:"event_slot_role_emoji"`
+	EventTypeOptions   []common.EventSelectorOption `json:"event_type_options"`
+	EventNameMap       map[types.EventType]string   `json:"event_name_map"`
+}
+
+func DefaultConfig() Config {
+	return Config{
+		ChannelIDs:         []string{},
+		RequireAdmin:       false,
+		GuideMessage:       true,
+		ChannelName:        "",
+		InitMessage:        EVENTS_CHANNEL_INIT_MESSAGE,
+		EventTypeEmojis:    EventTypeEmojis,
+		EventSlots:         EventSlots,
+		EventSlotsCount:    EventSlotsCount,
+		EventSlotRoleName:  EventSlotRoleName,
+		EventSlotRoleEmoji: EventSlotRoleEmoji,
+		EventTypeOptions:   EVENT_TYPE_OPTIONS,
+		EventNameMap: map[types.EventType]string{
+			types.EventTypeDungeonNormal: EventNameDungeonNormal,
+			types.EventTypeDungeonM1:     EventNameDungeonM1,
+			types.EventTypeDungeonM2:     EventNameDungeonM2,
+			types.EventTypeDungeonM3:     EventNameDungeonM3,
+			types.EventTypeRaidGorgon:    EventNameRaidGorgon,
+			types.EventTypeRaidDevour:    EventNameRaidDevour,
+			types.EventTypeOPR:           EventNameOPR,
+			types.EventTypeArena:         EventNameArena,
+			types.EventTypeInfluenceRace: EventNameInfluenceRace,
+			types.EventTypeLootRoute:     EventNameLootRoute,
+			types.EventTypeWar:           EventNameWar,
+		},
+	}
+}
 
 var (
 	EVENTS_CHANNEL_IDS   = []string{}
@@ -20,20 +64,6 @@ const (
 	EVENTS_CHANNEL_INIT_MESSAGE = "**Clique no botão abaixo** ou **envie /evento** para criar um evento.\n\nPara encerrar um evento, **clique no botão de encerrar**x."
 )
 
-const (
-	EventNameDungeonNormal = "Dungeon Normal"
-	EventNameDungeonM1     = "Dungeon Mutada (M1)"
-	EventNameDungeonM2     = "Dungeon Mutada (M2)"
-	EventNameDungeonM3     = "Dungeon Mutada (M3)"
-	EventNameRaidGorgon    = "Raid Gorgonas"
-	EventNameRaidDevour    = "Raid Devorador"
-	EventNameOPR           = "Outpost Rush (OPR)"
-	EventNameArena         = "Arena"
-	EventNameInfluenceRace = "Corrida de Influência"
-	EventNameWar           = "Guerra"
-	EventNameLootRoute     = "Rota"
-)
-
 var EventSlotsCount = map[types.EventType]int{
 	types.EventTypeDungeonNormal: 5,
 	types.EventTypeDungeonM1:     5,
@@ -44,19 +74,6 @@ var EventSlotsCount = map[types.EventType]int{
 	types.EventTypeOPR:           5,
 	types.EventTypeArena:         3,
 }
-
-const (
-	EventTypeEmojiDungeonNormal = "🧌"
-	EventTypeEmojiDungeonM1     = "1️⃣"
-	EventTypeEmojiDungeonM2     = "2️⃣"
-	EventTypeEmojiDungeonM3     = "3️⃣"
-	EventTypeEmojiRaidGorgon    = "🗿"
-	EventTypeEmojiRaidDevour    = "🪱"
-	EventTypeEmojiOPR           = "⚔️"
-	EventTypeEmojiArena         = "🏹"
-	EventTypeEmojiInfluenceRace = "🏁"
-	EventTypeEmojiLootRoute     = "💎"
-)
 
 // Event slots
 var EventSlots = map[types.EventType]string{
@@ -71,25 +88,6 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeInfluenceRace: "",
 	types.EventTypeLootRoute:     "",
 }
-
-type EventSlotRole rune
-
-const (
-	EventSlotTank         EventSlotRole = 'T'
-	EventSlotDPS          EventSlotRole = 'D'
-	EventSlotAny          EventSlotRole = 'A'
-	EventSlotHeal         EventSlotRole = 'H'
-	EventSlotRangedTank   EventSlotRole = '0' // Ranged Tank
-	EventSlotDPSBlood     EventSlotRole = '1' // Rapier Blood
-	EventSlotDPSEvade     EventSlotRole = '2' // Rapier Evade
-	EventSlotDPSSpear     EventSlotRole = '3' // Lança
-	EventSlotDPSSerenity  EventSlotRole = '4' // Serenidade
-	EventSlotDPSFire      EventSlotRole = '5' // Fire DPS
-	EventSlotDPSRendBot   EventSlotRole = 'R' // Rend Bot
-	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
-	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
-	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
-)
 
 var EventSlotRoleName = map[EventSlotRole]string{
 	EventSlotTank:         "Tank",
@@ -136,103 +134,78 @@ var EventTypeEmojis = map[types.EventType]string{
 	types.EventTypeLootRoute:     EventTypeEmojiLootRoute,
 }
 
+var EventTypeNames = map[types.EventType]string{
+	types.EventTypeDungeonNormal: EventNameDungeonNormal,
+	types.EventTypeDungeonM1:     EventNameDungeonM1,
+	types.EventTypeDungeonM2:     EventNameDungeonM2,
+	types.EventTypeDungeonM3:     EventNameDungeonM3,
+	types.EventTypeRaidGorgon:    EventNameRaidGorgon,
+	types.EventTypeRaidDevour:    EventNameRaidDevour,
+	types.EventTypeOPR:           EventNameOPR,
+	types.EventTypeArena:         EventNameArena,
+	types.EventTypeInfluenceRace: EventNameInfluenceRace,
+	types.EventTypeLootRoute:     EventNameLootRoute,
+	types.EventTypeWar:           EventNameWar,
+}
+
 var (
-	EVENT_TYPE_OPTIONS = []discordgo.SelectMenuOption{
+	EVENT_TYPE_OPTIONS = []common.EventSelectorOption{
 		{
 			Label: EventNameLootRoute,
 			Value: string(types.EventTypeLootRoute),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiLootRoute,
-			},
+			Emoji: EventTypeEmojiLootRoute,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidGorgon, EventSlotsCount[types.EventTypeRaidGorgon]),
 			Value: string(types.EventTypeRaidGorgon),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiRaidGorgon,
-			},
+			Emoji: EventTypeEmojiRaidGorgon,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidDevour, EventSlotsCount[types.EventTypeRaidDevour]),
 			Value: string(types.EventTypeRaidDevour),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiRaidDevour,
-			},
+			Emoji: EventTypeEmojiRaidDevour,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameOPR, EventSlotsCount[types.EventTypeOPR]),
 			Value: string(types.EventTypeOPR),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiOPR,
-			},
+			Emoji: EventTypeEmojiOPR,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameArena, EventSlotsCount[types.EventTypeArena]),
 			Value: string(types.EventTypeArena),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiArena,
-			},
+			Emoji: EventTypeEmojiArena,
 		},
 		{
 			Label: fmt.Sprintf("%s", EventNameInfluenceRace),
 			Value: string(types.EventTypeInfluenceRace),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiInfluenceRace,
-			},
+			Emoji: EventTypeEmojiInfluenceRace,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonNormal, EventSlotsCount[types.EventTypeDungeonNormal]),
 			Value: string(types.EventTypeDungeonNormal),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiDungeonNormal,
-			},
+			Emoji: EventTypeEmojiDungeonNormal,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM1, EventSlotsCount[types.EventTypeDungeonM1]),
 			Value: string(types.EventTypeDungeonM1),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiDungeonM1,
-			},
+			Emoji: EventTypeEmojiDungeonM1,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM2, EventSlotsCount[types.EventTypeDungeonM2]),
 			Value: string(types.EventTypeDungeonM2),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiDungeonM2,
-			},
+			Emoji: EventTypeEmojiDungeonM2,
 		},
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM3, EventSlotsCount[types.EventTypeDungeonM3]),
 			Value: string(types.EventTypeDungeonM3),
-			Emoji: &discordgo.ComponentEmoji{
-				Name: EventTypeEmojiDungeonM3,
-			},
+			Emoji: EventTypeEmojiDungeonM3,
 		},
 	}
 )
 
 func getEventTypeName(eventType types.EventType) string {
-	switch eventType {
-	case types.EventTypeDungeonNormal:
-		return EventTypeEmojiDungeonNormal + " " + EventNameDungeonNormal
-	case types.EventTypeDungeonM1:
-		return EventTypeEmojiDungeonM1 + " " + EventNameDungeonM1
-	case types.EventTypeDungeonM2:
-		return EventTypeEmojiDungeonM2 + " " + EventNameDungeonM2
-	case types.EventTypeDungeonM3:
-		return EventTypeEmojiDungeonM3 + " " + EventNameDungeonM3
-	case types.EventTypeRaidGorgon:
-		return EventTypeEmojiRaidGorgon + " " + EventNameRaidGorgon
-	case types.EventTypeRaidDevour:
-		return EventTypeEmojiRaidDevour + " " + EventNameRaidDevour
-	case types.EventTypeOPR:
-		return EventTypeEmojiOPR + " " + EventNameOPR
-	case types.EventTypeArena:
-		return EventTypeEmojiArena + " " + EventNameArena
-	case types.EventTypeInfluenceRace:
-		return EventTypeEmojiInfluenceRace + " " + EventNameInfluenceRace
-	case types.EventTypeLootRoute:
-		return EventTypeEmojiLootRoute + " " + EventNameLootRoute
+	if name, ok := EventTypeNames[eventType]; ok {
+		return fmt.Sprintf("%s %s", EventTypeEmojis[eventType], name)
 	}
 
 	return ""

@@ -6,7 +6,6 @@ import (
 	"log"
 	"nwmanager/database"
 	"nwmanager/discordbot/discordutils"
-	"nwmanager/discordbot/globals"
 	"os"
 	"strings"
 
@@ -28,8 +27,16 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		EVENTS_REQUIRE_ADMIN = true
 	}
 
+	if v := os.Getenv("EVENTS_GUIDE_MESSAGE"); v != "" {
+		EVENTS_GUIDE_MESSAGE = v == "true"
+	}
+
 	for _, channel_id := range EVENTS_CHANNEL_IDS {
-		_ = setupEventsChannel(ctx, dg, db, globals.ACCESS_ROLE_IDS[globals.EVERYONE_ROLE_NAME], globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME], channel_id)
+		_, err := setupEventsChannel(ctx, dg, db, channel_id)
+		if err != nil {
+			log.Printf("Cannot setup events channel %s: %v", channel_id, err)
+			continue
+		}
 		dg.AddHandler(discordutils.CreateHandler(*GuildID, channel_id, handlers, db))
 	}
 
@@ -41,15 +48,16 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 		log.Fatalf("Cannot create slash command: %v", err)
 	}
 
-	_, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
-		Name:        "encerrar",
-		Description: "Encerre um evento",
-	})
-	if err != nil {
-		log.Fatalf("Cannot create slash command: %v", err)
-	}
+	dg.ApplicationCommandDelete(*AppID, *GuildID, "encerrar")
 
-	// dg.AddHandler(HandleReactionAdd(*GuildID, dg, db))
+	// _, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
+	// 	Name:        "encerrar",
+	// 	Description: "Encerre um evento",
+	// })
+	// if err != nil {
+	// 	log.Fatalf("Cannot create slash command: %v", err)
+	// }
+
 	dg.AddHandler(HandleMessages(*GuildID, dg, db))
 	dg.AddHandler(HandleEventClose(*GuildID, dg, db))
 
