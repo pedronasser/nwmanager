@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"log"
 	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/events"
 	"nwmanager/discordbot/globals"
-	"nwmanager/discordbot/management"
-	"nwmanager/discordbot/signup"
-	"nwmanager/discordbot/war"
-	"nwmanager/discordbot/web"
+	"nwmanager/discordbot/register"
 	"os"
 	"os/signal"
 	"slices"
@@ -32,11 +30,12 @@ func init() {
 }
 
 func main() {
+	GuildName := os.Getenv("GUILD_NAME")
 	Token = os.Getenv("DISCORD_BOT_TOKEN")
 
 	ctx := context.Background()
-	os.MkdirAll("static", os.ModePerm)
-	web.Setup(ctx)
+	// os.MkdirAll("static", os.ModePerm)
+	// web.Setup(ctx)
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Token)
@@ -69,16 +68,10 @@ func main() {
 	if shouldLoadModule("events") {
 		events.Setup(ctx, dg, &AppID, &GuildID, db)
 	}
-	if shouldLoadModule("war") {
-		war.Setup(ctx, dg, &AppID, &GuildID, db)
-	}
-	if shouldLoadModule("management") {
-		management.Setup(ctx, dg, &AppID, &GuildID, db)
-	}
-	if shouldLoadModule("signup") {
-		signup.Setup(ctx, dg, &AppID, &GuildID, db)
-	}
 
+	ml := common.NewModuleManager(GuildName, db, dg)
+	ml.RegisterModule("register", &register.RegisterModule{})
+	ml.Run(ctx)
 	// Just like the ping pong example, we only care about receiving message
 	// events in this example.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildVoiceStates | discordgo.IntentGuilds
@@ -110,6 +103,10 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+func loadModules() {
+
 }
 
 func shouldLoadModule(m string) bool {
