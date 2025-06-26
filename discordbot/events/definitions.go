@@ -8,51 +8,6 @@ import (
 	"slices"
 )
 
-type Config struct {
-	ChannelIDs   []string `json:"channel_ids"`
-	RequireAdmin bool     `json:"require_admin"`
-	GuideMessage bool     `json:"guide_message"`
-	ChannelName  string   `json:"channel_name"`
-	InitMessage  string   `json:"init_message"`
-
-	EventTypeEmojis    map[types.EventType]string   `json:"event_type_emojis"`
-	EventSlots         map[types.EventType]string   `json:"event_slots"`
-	EventSlotsCount    map[types.EventType]int      `json:"event_slots_count"`
-	EventSlotRoleName  map[EventSlotRole]string     `json:"event_slot_role_name"`
-	EventSlotRoleEmoji map[EventSlotRole]string     `json:"event_slot_role_emoji"`
-	EventTypeOptions   []common.EventSelectorOption `json:"event_type_options"`
-	EventNameMap       map[types.EventType]string   `json:"event_name_map"`
-}
-
-func DefaultConfig() Config {
-	return Config{
-		ChannelIDs:         []string{},
-		RequireAdmin:       false,
-		GuideMessage:       true,
-		ChannelName:        "",
-		InitMessage:        EVENTS_CHANNEL_INIT_MESSAGE,
-		EventTypeEmojis:    EventTypeEmojis,
-		EventSlots:         EventSlots,
-		EventSlotsCount:    EventSlotsCount,
-		EventSlotRoleName:  EventSlotRoleName,
-		EventSlotRoleEmoji: EventSlotRoleEmoji,
-		EventTypeOptions:   EVENT_TYPE_OPTIONS,
-		EventNameMap: map[types.EventType]string{
-			types.EventTypeDungeonNormal: EventNameDungeonNormal,
-			types.EventTypeDungeonM1:     EventNameDungeonM1,
-			types.EventTypeDungeonM2:     EventNameDungeonM2,
-			types.EventTypeDungeonM3:     EventNameDungeonM3,
-			types.EventTypeRaidGorgon:    EventNameRaidGorgon,
-			types.EventTypeRaidDevour:    EventNameRaidDevour,
-			types.EventTypeOPR:           EventNameOPR,
-			types.EventTypeArena:         EventNameArena,
-			types.EventTypeInfluenceRace: EventNameInfluenceRace,
-			types.EventTypeLootRoute:     EventNameLootRoute,
-			types.EventTypeWar:           EventNameWar,
-		},
-	}
-}
-
 var (
 	EVENTS_CHANNEL_IDS   = []string{}
 	EVENTS_REQUIRE_ADMIN = false

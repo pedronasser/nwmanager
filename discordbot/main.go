@@ -10,8 +10,6 @@ import (
 	"nwmanager/discordbot/register"
 	"os"
 	"os/signal"
-	"slices"
-	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -45,48 +43,17 @@ func main() {
 	}
 	dg.StateEnabled = true
 
-	var AppID = os.Getenv("DISCORD_APP_ID")
-	var GuildID = os.Getenv("DISCORD_GUILD_ID")
-
-	dg.State.TrackChannels = true
-	dg.State.TrackRoles = true
-	guild, err := dg.Guild(GuildID)
-	if err != nil {
-		log.Fatalf("Cannot get guild: %v", err)
-	}
-	err = dg.State.GuildAdd(guild)
-	if err != nil {
-		log.Fatalf("Cannot add guild to state: %v", err)
-	}
-
 	db, err := database.NewMongoDB(ctx, os.Getenv("MONGO_URI"))
 	if err != nil {
 		log.Fatalf("failed to create database: %v", err)
 	}
 
-	globals.Setup(ctx, dg, &AppID, &GuildID)
-	if shouldLoadModule("events") {
-		events.Setup(ctx, dg, &AppID, &GuildID, db)
-	}
-
 	ml := common.NewModuleManager(GuildName, db, dg)
+	ml.RegisterModule("globals", &globals.GlobalsModule{})
 	ml.RegisterModule("register", &register.RegisterModule{})
-	ml.Run(ctx)
-	// Just like the ping pong example, we only care about receiving message
-	// events in this example.
-	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentGuildVoiceStates | discordgo.IntentGuilds
+	ml.RegisterModule("events", &events.EventsModule{})
 
-	// dg.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-	// 	for _, guild := range r.Guilds {
-	// 		// fmt.Println("Connected to guild:", guild.Name, "with ID:", guild.ID)
-	// 		guild, err := dg.Guild(guild.ID) // Ensure the guild is cached
-	// 		if err != nil {
-	// 			log.Printf("Error fetching guild %s: %v", guild.ID, err)
-	// 			continue
-	// 		}
-	// 		fmt.Printf("Guild Name: %s, ID: %s, Member Count: %d\n", guild.Name, guild.ID, guild.MemberCount)
-	// 	}
-	// })
+	ml.Run(ctx)
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -103,23 +70,4 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	dg.Close()
-}
-
-func loadModules() {
-
-}
-
-func shouldLoadModule(m string) bool {
-	modulesEnv := os.Getenv("MODULES")
-	if modulesEnv == "" {
-		return true
-	}
-
-	if modulesEnv == "all" {
-		return true
-	}
-
-	var modules []string = strings.Split(modulesEnv, ",")
-
-	return slices.Contains(modules, m)
 }

@@ -26,16 +26,16 @@ func (ctx *ModuleContext) Session() *discordgo.Session {
 	return ctx.session
 }
 
-func (ctx *ModuleContext) Database() database.Database {
+func (ctx *ModuleContext) DB() database.Database {
 	return ctx.db
 }
 
-func (ctx *ModuleContext) Config(moduleName string) (any, error) {
+func (ctx *ModuleContext) Config(moduleName string) any {
 	config, exists := ctx.configs[moduleName]
 	if !exists {
-		return nil, fmt.Errorf("config for module %s not found", moduleName)
+		panic(fmt.Sprintf("Module %s config not found", moduleName))
 	}
-	return config, nil
+	return config
 }
 
 type Module[T any] interface {

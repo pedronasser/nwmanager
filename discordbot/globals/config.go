@@ -43,6 +43,7 @@ var CLASS_CATEGORY_IDS map[string]string
 
 func init() {
 	_ = godotenv.Load()
+
 	DB_PREFIX = helpers.LoadOrDefault("DB_PREFIX", "")
 
 	EVERYONE_ROLE_NAME = helpers.LoadOrDefault("EVERYONE_ROLE_NAME", "@everyone")
