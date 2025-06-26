@@ -81,7 +81,7 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonM1:     "THDDD",
 	types.EventTypeDungeonM2:     "THDDD",
 	types.EventTypeDungeonM3:     "THDDD",
-	types.EventTypeRaidGorgon:    "TL222 S1H22",
+	types.EventTypeRaidGorgon:    "TL223 S1H22",
 	types.EventTypeRaidDevour:    "R5HFS 1222E 12223 RPPPP",
 	types.EventTypeOPR:           "THDDD",
 	types.EventTypeArena:         "",
