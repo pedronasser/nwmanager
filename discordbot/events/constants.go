@@ -31,6 +31,8 @@ const (
 	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
 	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
 	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
+	EventSlotHealFlail    EventSlotRole = 'L' // Heal/Flail
+	EventSlotDPSEvadeFire EventSlotRole = 'E' // Evade Fire
 )
 
 const (

@@ -81,8 +81,8 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonM1:     "THDDD",
 	types.EventTypeDungeonM2:     "THDDD",
 	types.EventTypeDungeonM3:     "THDDD",
-	types.EventTypeRaidGorgon:    "THDDD HDDDD",
-	types.EventTypeRaidDevour:    "T5HFS 12223 12224 RPPPP",
+	types.EventTypeRaidGorgon:    "TL222 S1H22",
+	types.EventTypeRaidDevour:    "R5HFS 1222E 12223 RPPPP",
 	types.EventTypeOPR:           "THDDD",
 	types.EventTypeArena:         "",
 	types.EventTypeInfluenceRace: "",
@@ -101,8 +101,10 @@ var EventSlotRoleName = map[EventSlotRole]string{
 	EventSlotDPSSerenity:  "Serenity",
 	EventSlotDPSRendBot:   "Rend Bot",
 	EventSlotDPSSnS:       "SnS DPS",
-	EventSlotDPSPadLight:  "Pad",
+	EventSlotDPSPadLight:  "Pad Light",
 	EventSlotSupportFlail: "Flail",
+	EventSlotHealFlail:    "Heal/Flail",
+	EventSlotDPSEvadeFire: "Evade Fire",
 }
 
 var EventSlotRoleEmoji = map[EventSlotRole]string{
@@ -119,6 +121,8 @@ var EventSlotRoleEmoji = map[EventSlotRole]string{
 	EventSlotDPSFire:      "🔥",
 	EventSlotDPSPadLight:  "💡",
 	EventSlotSupportFlail: "🌀",
+	EventSlotHealFlail:    "🪄",
+	EventSlotDPSEvadeFire: "⚡",
 }
 
 var EventTypeEmojis = map[types.EventType]string{
