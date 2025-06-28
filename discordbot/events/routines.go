@@ -1,10 +1,9 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
@@ -23,19 +22,18 @@ var (
 	EVENT_NOTIFICATION_REMINDER time.Duration = 15 * time.Minute
 )
 
-func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
+func eventsCheckRoutine(ctx *common.ModuleContext) {
 	// Cleanup completed events
 	ticker := time.NewTicker(EVENT_CHECK_INTERVAL)
 	for {
 		<-ticker.C
 		fmt.Println("Checking events...")
-		ctx := context.Background()
-		res, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx, bson.M{})
+		res, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx.Context, bson.M{})
 		if err != nil {
 			log.Fatalf("Cannot get events: %v", err)
 		}
 		now := GetCurrentTimeAsUTC()
-		for res.Next(ctx) {
+		for res.Next(ctx.Context) {
 			var event types.Event
 			err := res.Decode(&event)
 			if err != nil {
@@ -43,7 +41,7 @@ func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 			}
 
 			if event.Status == types.EventStatusCompleted && event.CompletedAt.Add(EVENT_COMPLETE_EXPIRE_DURATION).Before(now) {
-				err := closeEvent(ctx, db, dg, &event)
+				err := closeEvent(ctx, &event)
 				if err != nil {
 					log.Printf("Could not close event: %v", err)
 					continue
@@ -63,9 +61,9 @@ func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 								discordutils.SendMemberDM(dg, player, fmt.Sprintf("O evento **%s** em que você se inscreveu está agendado para iniciar em **15 minutos**. Verifique o canal de eventos para mais informações.", fmt.Sprintf("%s - %s", getEventTypeName(event.Type), event.Title)))
 							}
 						}
-					}(dg)
+					}(ctx.Session())
 
-					_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"notified_at": now}})
+					_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"notified_at": now}})
 					if err != nil {
 						log.Fatalf("Cannot update event: %v", err)
 					}
@@ -74,7 +72,7 @@ func eventsCheckRoutine(db database.Database, dg *discordgo.Session) {
 				}
 
 				if event.ScheduledAt.Add(EVENT_MAX_DURATION + EVENT_COMPLETE_EXPIRE_DURATION).Before(now) {
-					closeEvent(ctx, db, dg, &event)
+					closeEvent(ctx, &event)
 					fmt.Println("Event closed", event.ID, "schedule date", *event.ScheduledAt, now)
 					continue
 				}

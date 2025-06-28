@@ -1,10 +1,9 @@
 package events
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
@@ -114,7 +113,7 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 	return embed
 }
 
-func addPlayerToEvent(userId string, db database.Database, event *types.Event, slotType EventSlotRole) error {
+func addPlayerToEvent(ctx *common.ModuleContext, userId string, event *types.Event, slotType EventSlotRole) error {
 	if EventSlots[event.Type] != "" {
 		freeSlots := getEventFreeSlotsByRole(event, slotType)
 		if len(freeSlots) == 0 {
@@ -133,8 +132,7 @@ func addPlayerToEvent(userId string, db database.Database, event *types.Event, s
 		event.PlayerSlots = append(event.PlayerSlots, userId)
 	}
 
-	ctx := context.Background()
-	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+	_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
 	if err != nil {
 		return errors.New("Não foi possível adicionar jogador ao evento.")
 	}
@@ -142,7 +140,7 @@ func addPlayerToEvent(userId string, db database.Database, event *types.Event, s
 	return nil
 }
 
-func removePlayerFromEvent(userId string, db database.Database, event *types.Event) {
+func removePlayerFromEvent(ctx *common.ModuleContext, userId string, event *types.Event) {
 	foundIndex := -1
 	for i, slot := range event.PlayerSlots {
 		if slot == userId {
@@ -160,14 +158,13 @@ func removePlayerFromEvent(userId string, db database.Database, event *types.Eve
 		event.PlayerSlots = append(event.PlayerSlots[:foundIndex], event.PlayerSlots[foundIndex+1:]...)
 	}
 
-	ctx := context.Background()
-	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+	_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
 	if err != nil {
 		return
 	}
 }
 
-func updateEventPlayerRole(u *discordgo.User, db database.Database, event *types.Event, slotType EventSlotRole) error {
+func updateEventPlayerRole(ctx *common.ModuleContext, u *discordgo.User, event *types.Event, slotType EventSlotRole) error {
 	if EventSlots[event.Type] == "" {
 		return errors.New("Este evento não possui slots de função.")
 	}
@@ -191,8 +188,7 @@ func updateEventPlayerRole(u *discordgo.User, db database.Database, event *types
 	event.PlayerSlots[foundIndex] = ""
 	event.PlayerSlots[freeSlots[0]] = u.ID
 
-	ctx := context.Background()
-	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
+	_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
 	if err != nil {
 		return errors.New("Não foi possível atualizar a função do jogador.")
 	}
@@ -200,18 +196,18 @@ func updateEventPlayerRole(u *discordgo.User, db database.Database, event *types
 	return nil
 }
 
-func updateEventMessage(s *discordgo.Session, event *types.Event) error {
-	events_channel, err := s.Channel(event.ChannelID)
+func updateEventMessage(ctx *common.ModuleContext, event *types.Event) error {
+	events_channel, err := ctx.Session().Channel(event.ChannelID)
 	if err != nil {
 		return fmt.Errorf("Cannot get events channel: %v", err)
 	}
 
-	message, err := s.ChannelMessage(events_channel.ID, event.MessageID)
+	message, err := ctx.Session().ChannelMessage(events_channel.ID, event.MessageID)
 	if err != nil {
 		return fmt.Errorf("Cannot get event message: %v", err)
 	}
 
-	_, err = s.ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(event))
+	_, err = ctx.Session().ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(event))
 	if err != nil {
 		return fmt.Errorf("Cannot edit event message: %v", err)
 	}
@@ -219,7 +215,7 @@ func updateEventMessage(s *discordgo.Session, event *types.Event) error {
 	return nil
 }
 
-func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) error {
+func createEvent(ctx *common.ModuleContext, i *discordgo.InteractionCreate, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) error {
 	event := types.Event{
 		ID:           primitive.NewObjectID(),
 		Title:        title,
@@ -235,27 +231,26 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db databa
 	}
 
 	if EventSlots[event.Type] != "" {
-		for i := 0; i < getEventSlotCount(event.Type); i++ {
+		for range getEventSlotCount(event.Type) {
 			event.PlayerSlots = append(event.PlayerSlots, "")
 		}
 	} else {
 		event.PlayerSlots = []string{i.Interaction.Member.User.ID}
 	}
 
-	events_channel, err := s.Channel(event.ChannelID)
+	events_channel, err := ctx.Session().Channel(event.ChannelID)
 	if err != nil {
 		return fmt.Errorf("Cannot get events channel: %v", err)
 	}
 
-	message, err := createEventMessage(s, events_channel, &event)
+	message, err := createEventMessage(ctx, events_channel, &event)
 	if err != nil {
 		return fmt.Errorf("Cannot create event message: %v", err)
 	}
 
 	event.MessageID = message.ID
 
-	ctx := context.Background()
-	_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).InsertOne(ctx, event)
+	_, err = ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).InsertOne(ctx.Context, event)
 	if err != nil {
 		return fmt.Errorf("Cannot insert event into database: %v", err)
 	}
@@ -263,7 +258,7 @@ func createEvent(s *discordgo.Session, i *discordgo.InteractionCreate, db databa
 	return nil
 }
 
-func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel, event *types.Event) (*discordgo.Message, error) {
+func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Channel, event *types.Event) (*discordgo.Message, error) {
 	components := []discordgo.MessageComponent{}
 
 	joinActionsRow := discordgo.ActionsRow{
@@ -329,7 +324,7 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 	)
 
 	eventMessage := buildEventMessage(event)
-	message, err := dg.ChannelMessageSendComplex(events_channel.ID,
+	message, err := ctx.Session().ChannelMessageSendComplex(events_channel.ID,
 		&discordgo.MessageSend{
 			Embed:      eventMessage,
 			Components: components,
@@ -339,7 +334,7 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 		return nil, fmt.Errorf("Cannot send event message: %v", err)
 	}
 
-	thread_channel, err := dg.MessageThreadStartComplex(events_channel.ID, message.ID, &discordgo.ThreadStart{
+	thread_channel, err := ctx.Session().MessageThreadStartComplex(events_channel.ID, message.ID, &discordgo.ThreadStart{
 		Name: eventMessage.Title,
 		Type: discordgo.ChannelTypeGuildPublicThread,
 	})
@@ -347,7 +342,7 @@ func createEventMessage(dg *discordgo.Session, events_channel *discordgo.Channel
 		return nil, fmt.Errorf("Cannot create thread for event: %v", err)
 	}
 
-	_, err = dg.ChannelMessageSend(thread_channel.ID, fmt.Sprintf("Este é o canal de discussão do evento **%s**. Aqui você pode conversar com os participantes e tirar dúvidas.", eventMessage.Title))
+	_, err = ctx.Session().ChannelMessageSend(thread_channel.ID, fmt.Sprintf("Este é o canal de discussão do evento **%s**. Aqui você pode conversar com os participantes e tirar dúvidas.", eventMessage.Title))
 	if err != nil {
 		return nil, fmt.Errorf("Cannot send thread message: %v", err)
 	}
@@ -359,20 +354,20 @@ func isUserAlreadyInEvent(event *types.Event, userID string) bool {
 	return slices.Contains(event.PlayerSlots, userID)
 }
 
-func removeEventMessage(dg *discordgo.Session, event *types.Event) error {
-	msg, err := dg.ChannelMessage(event.ChannelID, event.MessageID)
+func removeEventMessage(ctx *common.ModuleContext, event *types.Event) error {
+	msg, err := ctx.Session().ChannelMessage(event.ChannelID, event.MessageID)
 	if err != nil {
 		return fmt.Errorf("Cannot get event message: %v", err)
 	}
 
 	if msg.Thread != nil {
-		_, err = dg.ChannelDelete(msg.Thread.ID)
+		_, err = ctx.Session().ChannelDelete(msg.Thread.ID)
 		if err != nil {
 			return fmt.Errorf("Cannot delete event thread: %v", err)
 		}
 	}
 
-	err = dg.ChannelMessageDelete(event.ChannelID, event.MessageID)
+	err = ctx.Session().ChannelMessageDelete(event.ChannelID, event.MessageID)
 	if err != nil {
 		return fmt.Errorf("Cannot delete event message: %v", err)
 	}
@@ -380,13 +375,13 @@ func removeEventMessage(dg *discordgo.Session, event *types.Event) error {
 	return nil
 }
 
-func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session, event *types.Event) error {
-	_, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"status": types.EventStatusClosed, "closed_at": time.Now()}})
+func closeEvent(ctx *common.ModuleContext, event *types.Event) error {
+	_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"status": types.EventStatusClosed, "closed_at": time.Now()}})
 	if err != nil {
 		return fmt.Errorf("Cannot close event: %v", err)
 	}
 
-	err = removeEventMessage(s, event)
+	err = removeEventMessage(ctx, event)
 	if err != nil {
 		return fmt.Errorf("Cannot remove event: %v", err)
 	}
@@ -394,8 +389,8 @@ func closeEvent(ctx context.Context, db database.Database, s *discordgo.Session,
 	return nil
 }
 
-func ownerHasEvent(ctx context.Context, db database.Database, owner *discordgo.User) bool {
-	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"owner": owner.ID, "status": types.EventStatusOpen})
+func ownerHasEvent(ctx *common.ModuleContext, owner *discordgo.User) bool {
+	res := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx.Context, bson.M{"owner": owner.ID, "status": types.EventStatusOpen})
 	if res.Err() != nil {
 		return false
 	}
@@ -419,12 +414,12 @@ func getEventTitle(event *types.Event) string {
 }
 
 func sendJoinRequest(
-	s *discordgo.Session,
+	ctx *common.ModuleContext,
 	event *types.Event,
 	user *discordgo.User,
 	slotType EventSlotRole,
 ) error {
-	channel, err := s.UserChannelCreate(event.Owner)
+	channel, err := ctx.Session().UserChannelCreate(event.Owner)
 	if err != nil {
 		return err
 	}
@@ -436,7 +431,7 @@ func sendJoinRequest(
 		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s** como **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(event), EventSlotRoleName[slotType])
 	}
 
-	_, err = s.ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{
+	_, err = ctx.Session().ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{
 		Content: content,
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{

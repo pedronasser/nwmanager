@@ -1,12 +1,8 @@
 package globals
 
 import (
-	"context"
-	"fmt"
-	"log"
 	"nwmanager/helpers"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 )
 
@@ -122,51 +118,3 @@ var CLASS_LEADER_ROLE_IDS = map[string]string{
 	DISRUPTOR_ROLE_NAME:     "",
 	ARCO_MOSQUETE_ROLE_NAME: "",
 }
-
-func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string) {
-	fmt.Println("Loading globals")
-	guild, err := dg.State.Guild(*GuildID)
-	if err != nil {
-		log.Fatalf("Cannot get guild: %v", err)
-	}
-
-	for roleName := range ACCESS_ROLE_IDS {
-		role := GetRoleByName(guild, roleName)
-		if role == nil {
-			fmt.Println("Role not found:", roleName)
-			continue
-		}
-		ACCESS_ROLE_IDS[roleName] = role.ID
-		fmt.Printf("Found Access Role %s: %s\n", roleName, role.ID)
-	}
-
-	for roleName := range CLASS_ROLE_IDS {
-		role := GetRoleByName(guild, roleName)
-		if role == nil {
-			continue
-		}
-		CLASS_ROLE_IDS[roleName] = role.ID
-		fmt.Printf("Found Class Role %s: %s\n", roleName, role.ID)
-	}
-
-	channels, err := dg.GuildChannels(*GuildID)
-	if err != nil {
-		log.Fatalf("Cannot get guild channels: %v", err)
-	}
-
-	for roleName := range CLASS_CATEGORY_IDS {
-		for _, channel := range channels {
-			if channel.Name == roleName {
-				CLASS_CATEGORY_IDS[roleName] = channel.ID
-				fmt.Printf("Found Class Category %s: %s\n", roleName, channel.ID)
-				break
-			}
-		}
-	}
-
-	if ADMIN_ROLE_ID != "" {
-		ACCESS_ROLE_IDS[ADMIN_ROLE_NAME] = ADMIN_ROLE_ID
-		fmt.Println("Overriden Admin Role ID")
-	}
-}
-

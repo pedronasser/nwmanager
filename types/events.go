@@ -1,8 +1,7 @@
 package types
 
 import (
-	"context"
-	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/globals"
 	"time"
 
@@ -61,15 +60,14 @@ type Event struct {
 	MessageID    string             `bson:"message_id" json:"message_id"`
 }
 
-func GetEventByID(ctx context.Context, db database.Database, id string) (*Event, error) {
-
+func GetEventByID(ctx *common.ModuleContext, id string) (*Event, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
 
 	var event Event
-	err = db.Collection(globals.DB_PREFIX+EventsCollection).FindOne(ctx, bson.M{"_id": oid}).Decode(&event)
+	err = ctx.DB().Collection(globals.DB_PREFIX+EventsCollection).FindOne(ctx.Context, bson.M{"_id": oid}).Decode(&event)
 	if err != nil {
 		return nil, err
 	}

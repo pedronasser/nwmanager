@@ -2,7 +2,6 @@ package discordutils
 
 import (
 	"fmt"
-	"nwmanager/database"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/globals"
 	"slices"
@@ -35,39 +34,34 @@ func SendInteractiveMessage(s *discordgo.Session, i *discordgo.InteractionCreate
 	})
 }
 
-func CreateHandler(guildID string, channelID string, handlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database), db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func CreateChannelHandler(ctx *common.ModuleContext, channel *discordgo.Channel, handlers map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate)) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		channel, err := s.Channel(i.ChannelID)
-		if err != nil {
-			return
-		}
-
-		if channel.Type == discordgo.ChannelTypeGuildText && (i.ChannelID != channelID || i.GuildID != guildID) {
+		if channel.Type == discordgo.ChannelTypeGuildText && (i.ChannelID != channel.ID || i.GuildID != channel.GuildID) {
 			return
 		}
 
 		switch i.Type {
 		case discordgo.InteractionApplicationCommand:
 			if h, ok := handlers["/"+i.ApplicationCommandData().Name]; ok {
-				h(s, i, db)
+				h(ctx, i)
 				return
 			}
 
 			for h, handler := range handlers {
 				if strings.HasPrefix("/"+i.ApplicationCommandData().Name, h) {
-					handler(s, i, db)
+					handler(ctx, i)
 					return
 				}
 			}
 		case discordgo.InteractionMessageComponent:
 			if h, ok := handlers["msg:"+i.MessageComponentData().CustomID]; ok {
-				h(s, i, db)
+				h(ctx, i)
 				return
 			}
 
 			for h, handler := range handlers {
 				if strings.HasPrefix("msg:"+i.MessageComponentData().CustomID, h) {
-					handler(s, i, db)
+					handler(ctx, i)
 					return
 				}
 			}
@@ -75,13 +69,13 @@ func CreateHandler(guildID string, channelID string, handlers map[string]func(s 
 		case discordgo.InteractionModalSubmit:
 			key := "modal:" + i.ModalSubmitData().CustomID
 			if h, ok := handlers[key]; ok {
-				h(s, i, db)
+				h(ctx, i)
 				return
 			}
 
 			for h, handler := range handlers {
 				if strings.HasPrefix(key, h) {
-					handler(s, i, db)
+					handler(ctx, i)
 					break
 				}
 			}

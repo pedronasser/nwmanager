@@ -47,10 +47,9 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	}
 	fmt.Println("Events module is enabled, setting up...")
 
-	globals, _ := ctx.Config("globals").(*globals.GlobalsConfig)
+	global, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 
 	dg := ctx.Session()
-	db := ctx.DB()
 
 	_ = godotenv.Load()
 	EVENTS_CHANNEL_IDS = strings.Split(os.Getenv("EVENTS_CHANNEL_IDS"), ",")
@@ -68,15 +67,22 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	}
 
 	for _, channel_id := range EVENTS_CHANNEL_IDS {
-		_, err := setupEventsChannel(ctx.Context, dg, db, channel_id)
+		_, err := setupEventsChannel(ctx, channel_id)
 		if err != nil {
 			log.Printf("Cannot setup events channel %s: %v", channel_id, err)
 			continue
 		}
-		dg.AddHandler(discordutils.CreateHandler(globals.GuildID, channel_id, handlers, db))
+
+		channel, err := ctx.Session().Channel(channel_id)
+		if err != nil {
+			log.Printf("Could not retrieve channel for event: %v", err)
+			continue
+		}
+
+		dg.AddHandler(discordutils.CreateChannelHandler(ctx, channel, handlers))
 	}
 
-	_, err := dg.ApplicationCommandCreate(globals.AppID, globals.GuildID, &discordgo.ApplicationCommand{
+	_, err := dg.ApplicationCommandCreate(global.AppID, global.GuildID, &discordgo.ApplicationCommand{
 		Name:        "evento",
 		Description: "Iniciar um novo evento",
 	})
@@ -84,7 +90,7 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 		log.Fatalf("Cannot create slash command: %v", err)
 	}
 
-	dg.ApplicationCommandDelete(globals.AppID, globals.GuildID, "encerrar")
+	dg.ApplicationCommandDelete(global.AppID, global.GuildID, "encerrar")
 
 	// _, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
 	// 	Name:        "encerrar",
@@ -94,10 +100,10 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	// 	log.Fatalf("Cannot create slash command: %v", err)
 	// }
 
-	dg.AddHandler(HandleMessages(globals.GuildID, dg, db))
-	dg.AddHandler(HandleEventClose(globals.GuildID, dg, db))
+	dg.AddHandler(HandleMessages(ctx, global.GuildID))
+	dg.AddHandler(HandleEventAction(ctx, global.GuildID))
 
-	go eventsCheckRoutine(db, dg)
+	go eventsCheckRoutine(ctx)
 
 	return true, nil
 }

@@ -1,10 +1,9 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"nwmanager/database"
+	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	. "nwmanager/helpers"
@@ -18,21 +17,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database){
-	"/evento": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
+	"/evento": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		if !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
-			discordutils.ReplyEphemeralMessage(s, i, "Este comando só pode ser usado em canal de eventos.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este comando só pode ser usado em canal de eventos.", 5*time.Second)
 			return
 		}
 
 		if !canCreateEvent(i.Member) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
 
-		ctx := context.Background()
-		if ownerHasEvent(ctx, db, i.Member.User) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
+		if ownerHasEvent(ctx, i.Member.User) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você já possui um evento em andamento.", 5*time.Second)
 			return
 		}
 
@@ -41,7 +39,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			Owner:        i.Member.User.ID,
 			ChannelID:    i.ChannelID,
 		}
-		discordutils.SendInteractiveMessage(s, i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
+		discordutils.SendInteractiveMessage(ctx.Session(), i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.SelectMenu{
@@ -57,15 +55,14 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"msg:create_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:create_event": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		if !canCreateEvent(i.Member) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
 
-		ctx := context.Background()
-		if ownerHasEvent(ctx, db, i.Member.User) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
+		if ownerHasEvent(ctx, i.Member.User) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você já possui um evento em andamento.", 5*time.Second)
 			return
 		}
 
@@ -75,7 +72,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			ChannelID:    i.ChannelID,
 		}
 
-		discordutils.SendInteractiveMessage(s, i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
+		discordutils.SendInteractiveMessage(ctx.Session(), i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.SelectMenu{
@@ -91,15 +88,14 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		)
 	},
 
-	"msg:create_closed_event": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:create_closed_event": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		if !canCreateEvent(i.Member) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você não possui permissão para criar eventos.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
 
-		ctx := context.Background()
-		if ownerHasEvent(ctx, db, i.Member.User) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você já possui um evento em andamento.", 5*time.Second)
+		if ownerHasEvent(ctx, i.Member.User) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você já possui um evento em andamento.", 5*time.Second)
 			return
 		}
 
@@ -107,7 +103,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			IsInviteOnly: true,
 			Owner:        i.Member.User.ID,
 		}
-		discordutils.SendInteractiveMessage(s, i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
+		discordutils.SendInteractiveMessage(ctx.Session(), i, "evento:create", "Qual tipo de evento gostaria de iniciar?",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.SelectMenu{
@@ -146,7 +142,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 	// 	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
 	// },
 
-	"msg:evento:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:evento:create": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		if _, ok := EventsData[i.Member.User.ID]; !ok {
 			return
 		}
@@ -154,7 +150,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		tipo := types.EventType(data.Values[0])
 		EventsData[i.Member.User.ID].Owner = i.Member.User.ID
 		EventsData[i.Member.User.ID].Type = tipo
-		discordutils.SendModal(s, i, "create", "Criação de evento",
+		discordutils.SendModal(ctx.Session(), i, "create", "Criação de evento",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.TextInput{
@@ -206,10 +202,10 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			},
 		)
 
-		s.InteractionResponseDelete(i.Interaction)
+		ctx.Session().InteractionResponseDelete(i.Interaction)
 	},
 
-	"msg:join_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:join_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "join_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -220,48 +216,46 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		role := EventSlotRole(classRune[0])
 		eventId := parts[0]
 
-		ctx := context.Background()
-		event, err := types.GetEventByID(ctx, db, eventId)
+		event, err := types.GetEventByID(ctx, eventId)
 		if err != nil {
 			return
 		}
 
 		if event.Status != types.EventStatusOpen {
-			discordutils.ReplyEphemeralMessage(s, i, "Este evento não está mais aberto para inscrições.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento não está mais aberto para inscrições.", 5*time.Second)
 			return
 		}
 
 		if event.IsInviteOnly && event.Owner != i.Member.User.ID {
-			discordutils.ReplyEphemeralMessage(s, i, "Um pedido de entrada foi feito ao organizador deste evento.\nAguarde a aprovação.", 5*time.Second)
-			sendJoinRequest(s, event, i.Member.User, role)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Um pedido de entrada foi feito ao organizador deste evento.\nAguarde a aprovação.", 5*time.Second)
+			sendJoinRequest(ctx, event, i.Member.User, role)
 			return
 		}
 
 		if isUserAlreadyInEvent(event, i.Member.User.ID) {
-			err = updateEventPlayerRole(i.Member.User, db, event, role)
+			err = updateEventPlayerRole(ctx, i.Member.User, event, role)
 		} else {
-			err = addPlayerToEvent(i.Member.User.ID, db, event, role)
+			err = addPlayerToEvent(ctx, i.Member.User.ID, event, role)
 		}
 		if err != nil {
-			discordutils.ReplyEphemeralMessage(s, i, err.Error(), 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, err.Error(), 5*time.Second)
 			return
 		}
 
-		err = updateEventMessage(s, event)
+		err = updateEventMessage(ctx, event)
 		if err != nil {
-			discordutils.ReplyEphemeralMessage(s, i, "Ocorreu um erro ao atualizar o evento.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Ocorreu um erro ao atualizar o evento.", 5*time.Second)
 			log.Printf("Cannot update event message: %v", err)
 			return
 		}
 
-		discordutils.ReplyEphemeralMessage(s, i, "Você foi inscrito no evento.", 5*time.Second)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você foi inscrito no evento.", 5*time.Second)
 	},
 
-	"msg:leave_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:leave_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		eventId := strings.TrimPrefix(i.MessageComponentData().CustomID, "leave_")
 
-		ctx := context.Background()
-		event, err := types.GetEventByID(ctx, db, eventId)
+		event, err := types.GetEventByID(ctx, eventId)
 		if err != nil {
 			return
 		}
@@ -271,17 +265,17 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		}
 
 		if !slices.Contains(event.PlayerSlots, i.Member.User.ID) {
-			discordutils.ReplyEphemeralMessage(s, i, "Você não está inscrito neste evento.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não está inscrito neste evento.", 5*time.Second)
 			return
 		}
 
-		removePlayerFromEvent(i.Member.User.ID, db, event)
-		updateEventMessage(s, event)
+		removePlayerFromEvent(ctx, i.Member.User.ID, event)
+		updateEventMessage(ctx, event)
 
-		discordutils.ReplyEphemeralMessage(s, i, "Você foi removido do evento.", 5*time.Second)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você foi removido do evento.", 5*time.Second)
 	},
 
-	"msg:approve_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:approve_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "approve_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 3 {
@@ -292,33 +286,32 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		userId := parts[1]
 		slot := EventSlotRole(parts[2][0])
 
-		ctx := context.Background()
-		event, err := types.GetEventByID(ctx, db, eventId)
+		event, err := types.GetEventByID(ctx, eventId)
 		if err != nil {
-			discordutils.ReplyEphemeralMessage(s, i, "Este evento não existe.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento não existe.", 5*time.Second)
 			return
 		}
 
 		if event.Status != types.EventStatusOpen {
-			discordutils.ReplyEphemeralMessage(s, i, "Este evento já foi encerrado.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento já foi encerrado.", 5*time.Second)
 			return
 		}
 
-		err = addPlayerToEvent(userId, db, event, slot)
+		err = addPlayerToEvent(ctx, userId, event, slot)
 		if err != nil {
-			discordutils.ReplyEphemeralMessage(s, i, err.Error(), 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, err.Error(), 5*time.Second)
 			return
 		}
 
-		updateEventMessage(s, event)
-		discordutils.ReplyEphemeralMessage(s, i, "Jogador aprovado no evento.", 5*time.Second)
+		updateEventMessage(ctx, event)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Jogador aprovado no evento.", 5*time.Second)
 
-		discordutils.SendMemberDM(s, userId, fmt.Sprintf("Seu pedido de entrada no evento %s foi aprovado pelo organizador.", event.Title))
+		discordutils.SendMemberDM(ctx.Session(), userId, fmt.Sprintf("Seu pedido de entrada no evento %s foi aprovado pelo organizador.", event.Title))
 
-		s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+		ctx.Session().ChannelMessageDelete(i.ChannelID, i.Message.ID)
 	},
 
-	"msg:reject_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"msg:reject_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "reject_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -329,8 +322,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 		userId := parts[1]
 		// slot := EventSlotRole(parts[2][0])
 
-		ctx := context.Background()
-		event, err := types.GetEventByID(ctx, db, eventId)
+		event, err := types.GetEventByID(ctx, eventId)
 		if err != nil {
 			return
 		}
@@ -339,7 +331,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			return
 		}
 
-		err = discordutils.SendModal(s, i, fmt.Sprintf("reject_confirm_%s_%s", eventId, userId), "Confirmação de recusa",
+		err = discordutils.SendModal(ctx.Session(), i, fmt.Sprintf("reject_confirm_%s_%s", eventId, userId), "Confirmação de recusa",
 			discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.TextInput{
@@ -357,7 +349,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 
 	},
 
-	"modal:reject_confirm_": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"modal:reject_confirm_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		id := strings.TrimPrefix(i.ModalSubmitData().CustomID, "reject_confirm_")
 		parts := strings.Split(id, "_")
 		if len(parts) != 2 {
@@ -372,12 +364,12 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 			motive = "Não informado."
 		}
 
-		discordutils.ReplyEphemeralMessage(s, i, "Jogador recusado no evento.", 5*time.Second)
-		discordutils.SendMemberDM(s, userId, fmt.Sprintf("Seu pedido de entrada no evento foi recusado pelo organizador.\nMotivo: **%s**", motive))
-		s.ChannelMessageDelete(i.ChannelID, i.Message.ID)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Jogador recusado no evento.", 5*time.Second)
+		discordutils.SendMemberDM(ctx.Session(), userId, fmt.Sprintf("Seu pedido de entrada no evento foi recusado pelo organizador.\nMotivo: **%s**", motive))
+		ctx.Session().ChannelMessageDelete(i.ChannelID, i.Message.ID)
 	},
 
-	"modal:create": func(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
+	"modal:create": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		data := i.ModalSubmitData()
 		if v, ok := EventsData[i.Member.User.ID]; ok {
 			title := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
@@ -394,20 +386,20 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 				}
 				d, err := time.Parse("02/01/2006 15:04", date+" "+hour)
 				if err != nil {
-					discordutils.ReplyEphemeralMessage(s, i, "A data/hora digitada está inválida.", 5*time.Second)
+					discordutils.ReplyEphemeralMessage(ctx.Session(), i, "A data/hora digitada está inválida.", 5*time.Second)
 					return
 				}
 				scheduledAt = &d
 			}
 
 			go func() {
-				err := createEvent(s, i, db, v.Type, v.ChannelID, title, description, scheduledAt, v.IsInviteOnly)
+				err := createEvent(ctx, i, v.Type, v.ChannelID, title, description, scheduledAt, v.IsInviteOnly)
 				if err != nil {
 					log.Printf("Cannot create event: %v", err)
-					discordutils.ReplyEphemeralMessage(s, i, "Ocorreu um erro ao criar o evento.", 5*time.Second)
+					discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Ocorreu um erro ao criar o evento.", 5*time.Second)
 					return
 				}
-				discordutils.ReplyEphemeralMessage(s, i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", v.ChannelID), 5*time.Second)
+				discordutils.ReplyEphemeralMessage(ctx.Session(), i, fmt.Sprintf("**EVENTO CRIADO.**\n\nPara encerrar o evento envie **/encerrar**.\nVeja mais informações em <#%s>.", v.ChannelID), 5*time.Second)
 			}()
 		}
 		delete(EventsData, i.Member.User.ID)
@@ -416,7 +408,7 @@ var handlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCre
 
 var EventsData = map[string]*types.Event{}
 
-func HandleMessages(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.MessageCreate) {
+func HandleMessages(ctx *common.ModuleContext, GuildID string) func(s *discordgo.Session, i *discordgo.MessageCreate) {
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
 		if GuildID != i.GuildID {
 			return
@@ -432,7 +424,7 @@ func HandleMessages(GuildID string, s *discordgo.Session, db database.Database) 
 	}
 }
 
-func HandleEventClose(GuildID string, s *discordgo.Session, db database.Database) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func HandleEventAction(ctx *common.ModuleContext, GuildID string) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if GuildID != i.GuildID || !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
 			return
@@ -440,18 +432,17 @@ func HandleEventClose(GuildID string, s *discordgo.Session, db database.Database
 
 		switch i.Type {
 		case discordgo.InteractionMessageComponent:
-			if strings.HasPrefix(i.MessageComponentData().CustomID, "close_event_") {
-				handleEventClose(s, i, db)
-				return
+			if id, found := strings.CutPrefix(i.MessageComponentData().CustomID, "close_event_"); found {
+				handleEventClose(ctx, i, id)
 			}
 
 			if id, found := strings.CutPrefix(i.MessageComponentData().CustomID, "edit_"); found {
-				handleEventEditPrompt(s, i, db, id)
+				handleEventEditPrompt(ctx, i, id)
 				return
 			}
 		case discordgo.InteractionModalSubmit:
 			if id, found := strings.CutPrefix(i.ModalSubmitData().CustomID, "edit_"); found {
-				handleEventEdit(s, i, db, id)
+				handleEventEdit(ctx, i, id)
 				return
 			}
 		default:
@@ -459,14 +450,12 @@ func HandleEventClose(GuildID string, s *discordgo.Session, db database.Database
 	}
 }
 
-func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database) {
-	id := strings.TrimPrefix(i.MessageComponentData().CustomID, "close_event_")
-	ctx := context.Background()
+func handleEventClose(ctx *common.ModuleContext, i *discordgo.InteractionCreate, id string) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx.Context, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -479,26 +468,25 @@ func handleEventClose(s *discordgo.Session, i *discordgo.InteractionCreate, db d
 	}
 
 	if event.Owner != i.Member.User.ID && !discordutils.IsMemberAdmin(i.Member) {
-		discordutils.ReplyEphemeralMessage(s, i, "Você não é o organizador do evento.", 5*time.Second)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}
 
-	err = closeEvent(ctx, db, s, &event)
+	err = closeEvent(ctx, &event)
 	if err != nil {
 		log.Printf("Cannot close event: %v", err)
 		return
 	}
 
-	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ENCERRADO.**", 5*time.Second)
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "**EVENTO ENCERRADO.**", 5*time.Second)
 }
 
-func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
-	ctx := context.Background()
+func handleEventEditPrompt(ctx *common.ModuleContext, i *discordgo.InteractionCreate, id string) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx.Context, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -511,7 +499,7 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 	}
 
 	if event.Owner != i.Member.User.ID {
-		discordutils.ReplyEphemeralMessage(s, i, "Você não é o organizador do evento.", 5*time.Second)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}
 
@@ -521,7 +509,7 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 		data = event.ScheduledAt.Format("02/01/2006")
 	}
 
-	discordutils.SendModal(s, i, "edit_"+event.ID.Hex(), "Editando evento",
+	discordutils.SendModal(ctx.Session(), i, "edit_"+event.ID.Hex(), "Editando evento",
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.TextInput{
@@ -578,13 +566,12 @@ func handleEventEditPrompt(s *discordgo.Session, i *discordgo.InteractionCreate,
 	)
 }
 
-func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db database.Database, id string) {
-	ctx := context.Background()
+func handleEventEdit(ctx *common.ModuleContext, i *discordgo.InteractionCreate, id string) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Fatalf("Cannot convert id to ObjectID: %v", err)
 	}
-	res := db.Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx, bson.M{"_id": oid})
+	res := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).FindOne(ctx.Context, bson.M{"_id": oid})
 	if res.Err() != nil {
 		log.Fatalf("Cannot find event: %v", res.Err())
 		return
@@ -597,7 +584,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db da
 	}
 
 	if event.Owner != i.Member.User.ID {
-		discordutils.ReplyEphemeralMessage(s, i, "Você não é o organizador do evento.", 5*time.Second)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}
 
@@ -610,7 +597,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db da
 	if date != "" && hour != "" {
 		d, err := time.Parse("02/01/2006 15:04", date+" "+hour)
 		if err != nil {
-			discordutils.ReplyEphemeralMessage(s, i, "A data/hora digitada está inválida.", 5*time.Second)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "A data/hora digitada está inválida.", 5*time.Second)
 			return
 		}
 		scheduledAt = &d
@@ -619,7 +606,7 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db da
 	event.Title = title
 	event.Description = description
 	event.ScheduledAt = scheduledAt
-	_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx,
+	_, err = ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context,
 		bson.M{"_id": oid},
 		bson.M{"$set": bson.M{"title": title, "description": description}},
 	)
@@ -627,17 +614,15 @@ func handleEventEdit(s *discordgo.Session, i *discordgo.InteractionCreate, db da
 		log.Fatalf("Cannot update event: %v", err)
 	}
 
-	updateEventMessage(s, &event)
-	discordutils.ReplyEphemeralMessage(s, i, "**EVENTO ATUALIZADO.**", 5*time.Second)
+	updateEventMessage(ctx, &event)
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "**EVENTO ATUALIZADO.**", 5*time.Second)
 }
 
 func setupEventsChannel(
-	ctx context.Context,
-	dg *discordgo.Session,
-	db database.Database,
+	ctx *common.ModuleContext,
 	channel_id string,
 ) (*discordgo.Channel, error) {
-	events_channel, err := dg.Channel(channel_id)
+	events_channel, err := ctx.Session().Channel(channel_id)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get events channel: %v", err)
 	}
@@ -673,12 +658,12 @@ func setupEventsChannel(
 	// 	}
 	// }
 
-	channel_msgs, err := dg.ChannelMessages(events_channel.ID, 100, "", "", "")
+	channel_msgs, err := ctx.Session().ChannelMessages(events_channel.ID, 100, "", "", "")
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get channel messages: %v", err)
 	}
 
-	c, err := db.Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx, bson.M{
+	c, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).Find(ctx.Context, bson.M{
 		"status":     types.EventStatusOpen,
 		"channel_id": events_channel.ID,
 	})
@@ -687,7 +672,7 @@ func setupEventsChannel(
 	}
 
 	var events []types.Event
-	if err = c.All(ctx, &events); err != nil {
+	if err = c.All(ctx.Context, &events); err != nil {
 		return nil, fmt.Errorf("Cannot decode events: %v", err)
 	}
 
@@ -696,17 +681,17 @@ func setupEventsChannel(
 		if event.MessageID != "" {
 			msgIDs = append(msgIDs, event.MessageID)
 		}
-		if _, err := dg.ChannelMessage(events_channel.ID, event.MessageID); err == nil {
+		if _, err := ctx.Session().ChannelMessage(events_channel.ID, event.MessageID); err == nil {
 			continue
 		}
 
 		fmt.Println("Creating message for event:", event.ID.Hex())
-		message, err := createEventMessage(dg, events_channel, &event)
+		message, err := createEventMessage(ctx, events_channel, &event)
 		if err != nil {
 			return nil, fmt.Errorf("Cannot create event message: %v", err)
 		}
 
-		_, err = db.Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx, bson.M{
+		_, err = ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{
 			"_id": event.ID,
 		}, bson.M{
 			"$set": bson.M{
@@ -724,7 +709,7 @@ func setupEventsChannel(
 		}
 
 		fmt.Println("Deleting message:", msg.ID, "from channel:", events_channel.ID)
-		dg.ChannelMessageDelete(events_channel.ID, msg.ID)
+		ctx.Session().ChannelMessageDelete(events_channel.ID, msg.ID)
 	}
 
 	return events_channel, nil
