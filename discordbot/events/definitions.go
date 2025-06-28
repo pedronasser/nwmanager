@@ -222,7 +222,7 @@ func getEventRoleByPosition(eventType types.EventType, position int) EventSlotRo
 
 	letters := 0
 	var role byte
-	for i := 0; i < len(slots); i++ {
+	for i := range len(slots) {
 		if slots[i] == ' ' {
 			continue
 		}
@@ -245,7 +245,7 @@ func getEventRoleNameByPosition(eventType types.EventType, position int) string 
 
 	letters := 0
 	var role byte
-	for i := 0; i < len(slots); i++ {
+	for i := range len(slots) {
 		if slots[i] == ' ' {
 			continue
 		}
@@ -303,7 +303,7 @@ func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int
 func getEventSlotTypes(event *types.Event) []EventSlotRole {
 	slotTypes := []EventSlotRole{}
 
-	for i, _ := range event.PlayerSlots {
+	for i := range event.PlayerSlots {
 		role := getEventRoleByPosition(event.Type, i)
 		if role == EventSlotAny {
 			continue
