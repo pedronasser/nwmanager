@@ -77,14 +77,6 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 
 	dg.ApplicationCommandDelete(global.AppID, global.GuildID, "encerrar")
 
-	// _, err = dg.ApplicationCommandCreate(*AppID, *GuildID, &discordgo.ApplicationCommand{
-	// 	Name:        "encerrar",
-	// 	Description: "Encerre um evento",
-	// })
-	// if err != nil {
-	// 	log.Fatalf("Cannot create slash command: %v", err)
-	// }
-
 	dg.AddHandler(HandleMessages(ctx, global.GuildID))
 	dg.AddHandler(HandleEventAction(ctx, global.GuildID))
 
