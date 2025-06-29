@@ -49,9 +49,9 @@ func main() {
 	}
 
 	ml := common.NewModuleManager(GuildName, db, dg)
-	ml.RegisterModule("globals", &globals.GlobalsModule{})
-	ml.RegisterModule("register", &register.RegisterModule{})
-	ml.RegisterModule("events", &events.EventsModule{})
+	ml.RegisterModule(globals.ModuleName, &globals.GlobalsModule{})
+	ml.RegisterModule(register.ModuleName, &register.RegisterModule{})
+	ml.RegisterModule(events.ModuleName, &events.EventsModule{})
 
 	ml.Run(ctx)
 
