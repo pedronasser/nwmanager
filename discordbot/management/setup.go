@@ -1,52 +1,52 @@
 package management
 
-import (
-	"context"
-	"fmt"
-	"os"
-	"time"
+// import (
+// 	"context"
+// 	"fmt"
+// 	"os"
+// 	"time"
 
-	"nwmanager/database"
-	"nwmanager/discordbot/discordutils"
+// 	"nwmanager/database"
+// 	"nwmanager/discordbot/discordutils"
 
-	"github.com/bwmarrin/discordgo"
-	"github.com/joho/godotenv"
-)
+// 	"github.com/bwmarrin/discordgo"
+// 	"github.com/joho/godotenv"
+// )
 
-var (
-	OPR_PRINTS_CHANNEL_ID = ""
-)
+// var (
+// 	OPR_PRINTS_CHANNEL_ID = ""
+// )
 
-func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, db database.Database) {
-	_ = godotenv.Load()
-	OPR_PRINTS_CHANNEL_ID = os.Getenv("OPR_PRINTS_CHANNEL_ID")
-	if OPR_PRINTS_CHANNEL_ID == "" {
-		fmt.Println("OPR_PRINTS_CHANNEL_ID is not set")
-		os.Exit(1)
-	}
+// func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, db database.Database) {
+// 	_ = godotenv.Load()
+// 	OPR_PRINTS_CHANNEL_ID = os.Getenv("OPR_PRINTS_CHANNEL_ID")
+// 	if OPR_PRINTS_CHANNEL_ID == "" {
+// 		fmt.Println("OPR_PRINTS_CHANNEL_ID is not set")
+// 		os.Exit(1)
+// 	}
 
-	fmt.Println("Loading management")
+// 	fmt.Println("Loading management")
 
-	dg.AddHandler(HandleTicketMessages(ctx, dg, GuildID, db))
-	dg.AddHandler(HandleTicketInteractions(ctx, dg, GuildID, db))
+// 	dg.AddHandler(HandleTicketMessages(ctx, dg, GuildID, db))
+// 	dg.AddHandler(HandleTicketInteractions(ctx, dg, GuildID, db))
 
-	routineExportPlayersCSV(ctx, db)
+// 	routineExportPlayersCSV(ctx, db)
 
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			<-ticker.C
-			members, err := discordutils.RetrieveAllMembers(dg, *GuildID)
-			if err != nil {
-				fmt.Printf("Error retrieving members: %v\n", err)
-				continue
-			}
-			routineRegisterNewPlayers(ctx, dg, GuildID, db, members)
-			routineArchiveUnavailablePlayers(ctx, dg, GuildID, db, members)
-			routineUnarchiveReturningPlayers(ctx, dg, GuildID, db, members)
-			routineDeleteArchivedPlayers(ctx, dg, db)
-			routineExportPlayersCSV(ctx, db)
-		}
-	}()
-}
+// 	go func() {
+// 		ticker := time.NewTicker(30 * time.Second)
+// 		defer ticker.Stop()
+// 		for {
+// 			<-ticker.C
+// 			members, err := discordutils.RetrieveAllMembers(dg, *GuildID)
+// 			if err != nil {
+// 				fmt.Printf("Error retrieving members: %v\n", err)
+// 				continue
+// 			}
+// 			routineRegisterNewPlayers(ctx, dg, GuildID, db, members)
+// 			routineArchiveUnavailablePlayers(ctx, dg, GuildID, db, members)
+// 			routineUnarchiveReturningPlayers(ctx, dg, GuildID, db, members)
+// 			routineDeleteArchivedPlayers(ctx, dg, db)
+// 			routineExportPlayersCSV(ctx, db)
+// 		}
+// 	}()
+// }

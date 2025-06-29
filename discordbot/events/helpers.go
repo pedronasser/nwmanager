@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"nwmanager/discordbot/common"
-	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"slices"
@@ -156,7 +155,7 @@ func removePlayerFromEvent(ctx *common.ModuleContext, userId string, event *type
 	if EventSlots[event.Type] != "" {
 		event.PlayerSlots[foundIndex] = ""
 	} else {
-		event.PlayerSlots = append(event.PlayerSlots[:foundIndex], event.PlayerSlots[foundIndex+1:]...)
+		event.PlayerSlots = slices.Delete(event.PlayerSlots, foundIndex, foundIndex+1)
 	}
 
 	_, err := ctx.DB().Collection(globals.DB_PREFIX+types.EventsCollection).UpdateOne(ctx.Context, bson.M{"_id": event.ID}, bson.M{"$set": bson.M{"player_slots": event.PlayerSlots}})
@@ -464,8 +463,8 @@ func sendJoinRequest(
 	return nil
 }
 
-func canCreateEvent(member *discordgo.Member) bool {
-	if EVENTS_REQUIRE_ADMIN && !discordutils.IsMemberAdmin(member) {
+func canCreateEvent(ctx *common.ModuleContext, member *discordgo.Member) bool {
+	if EVENTS_REQUIRE_ADMIN && !globals.IsMemberAdmin(ctx, member) {
 		return false
 	}
 

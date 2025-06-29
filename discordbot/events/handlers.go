@@ -25,7 +25,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 			return
 		}
 
-		if !canCreateEvent(i.Member) {
+		if !canCreateEvent(ctx, i.Member) {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
@@ -57,7 +57,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	},
 
 	"msg:create_event": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-		if !canCreateEvent(i.Member) {
+		if !canCreateEvent(ctx, i.Member) {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
@@ -90,7 +90,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	},
 
 	"msg:create_closed_event": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-		if !canCreateEvent(i.Member) {
+		if !canCreateEvent(ctx, i.Member) {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui permissão para criar eventos.", 5*time.Second)
 			return
 		}
@@ -470,7 +470,7 @@ func handleEventClose(ctx *common.ModuleContext, i *discordgo.InteractionCreate,
 		log.Fatalf("Cannot decode event: %v", err)
 	}
 
-	if event.Owner != i.Member.User.ID && !discordutils.IsMemberAdmin(i.Member) {
+	if event.Owner != i.Member.User.ID && !globals.IsMemberAdmin(ctx, i.Member) {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não é o organizador do evento.", 5*time.Second)
 		return
 	}

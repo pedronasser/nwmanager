@@ -1,6 +1,11 @@
 package globals
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"nwmanager/discordbot/common"
+	"slices"
+
+	"github.com/bwmarrin/discordgo"
+)
 
 var knownRoles = map[string]discordgo.Role{}
 
@@ -16,4 +21,9 @@ func GetRoleByName(guild *discordgo.Guild, roleName string) *discordgo.Role {
 	}
 
 	return nil
+}
+
+func IsMemberAdmin(ctx *common.ModuleContext, member *discordgo.Member) bool {
+	globalCfg := GetModuleConfig(ctx)
+	return slices.Contains(member.Roles, globalCfg.AdminRoleID)
 }

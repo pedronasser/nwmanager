@@ -3,7 +3,6 @@ package discordutils
 import (
 	"fmt"
 	"nwmanager/discordbot/common"
-	"nwmanager/discordbot/globals"
 	"slices"
 	"strings"
 	"time"
@@ -177,30 +176,6 @@ func GetMemberName(member *discordgo.Member) string {
 		return member.User.GlobalName
 	}
 	return member.User.Username
-}
-
-func IsMemberAdmin(member *discordgo.Member) bool {
-	for _, role := range member.Roles {
-		if globals.ACCESS_ROLE_IDS[globals.ADMIN_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.ADMIN_ROLE_NAME] {
-			return true
-		}
-		if globals.ACCESS_ROLE_IDS[globals.CONSUL_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.CONSUL_ROLE_NAME] {
-			return true
-		}
-		if globals.ACCESS_ROLE_IDS[globals.OFFICER_ROLE_NAME] != "" && role == globals.ACCESS_ROLE_IDS[globals.OFFICER_ROLE_NAME] {
-			return true
-		}
-	}
-
-	return false
-}
-
-func IsMember(member *discordgo.Member) bool {
-	if globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME] == "" {
-		panic("MEMBER_ROLE_NAME is not set")
-	}
-
-	return slices.Contains(member.Roles, globals.ACCESS_ROLE_IDS[globals.MEMBER_ROLE_NAME])
 }
 
 func RetrieveAllMembers(dg *discordgo.Session, GuildID string) (map[string]*discordgo.Member, error) {
