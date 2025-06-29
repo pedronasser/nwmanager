@@ -1,16 +1,16 @@
 package helpers
 
 import (
-	"fmt"
+	"log"
 	"os"
 )
 
 func LoadOrDefault(key string, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
-		fmt.Println("Using default value for", key, ":", defaultValue)
+		log.Println("Using default value for", key, ":", defaultValue)
 		return defaultValue
 	}
-	fmt.Println("Loaded", key, ":", value)
+	log.Println("Loaded", key, ":", value)
 	return value
 }

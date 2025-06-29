@@ -3,6 +3,9 @@ package voice_channel
 import (
 	"fmt"
 	"nwmanager/discordbot/common"
+	"os"
+	"slices"
+	"strings"
 )
 
 const ModuleName = "voice_channel"
@@ -28,7 +31,8 @@ func (s *VoiceChannelModule) Setup(ctx *common.ModuleContext, config any) (bool,
 }
 
 func (s *VoiceChannelModule) DefaultConfig() any {
+	var IsModuleEnabledFromEnv = slices.Contains(strings.Split(os.Getenv("MODULES"), ","), ModuleName)
 	return &VoiceChannelConfig{
-		Enabled: false,
+		Enabled: IsModuleEnabledFromEnv,
 	}
 }

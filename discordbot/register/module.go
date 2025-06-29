@@ -3,6 +3,9 @@ package register
 import (
 	"fmt"
 	"nwmanager/discordbot/common"
+	"os"
+	"slices"
+	"strings"
 )
 
 const ModuleName = "register"
@@ -28,7 +31,8 @@ func (s *RegisterModule) Setup(ctx *common.ModuleContext, config any) (bool, err
 }
 
 func (s *RegisterModule) DefaultConfig() any {
+	var IsModuleEnabledFromEnv = slices.Contains(strings.Split(os.Getenv("MODULES"), ","), ModuleName)
 	return &RegisterConfig{
-		Enabled: true,
+		Enabled: IsModuleEnabledFromEnv,
 	}
 }

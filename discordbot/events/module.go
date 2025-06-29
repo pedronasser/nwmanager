@@ -1,13 +1,13 @@
 package events
 
 import (
-	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -45,7 +45,7 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	if !cfg.Enabled {
 		return false, nil
 	}
-	fmt.Println("Events module is enabled, setting up...")
+	log.Println("Events module is enabled, setting up...")
 
 	global, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 
@@ -96,8 +96,9 @@ func (s *EventsModule) DefaultConfig() any {
 		EVENTS_GUIDE_MESSAGE = v == "true"
 	}
 
+	var IsModuleEnabledFromEnv = slices.Contains(strings.Split(os.Getenv("MODULES"), ","), ModuleName)
 	return &EventsConfig{
-		Enabled: true,
+		Enabled: IsModuleEnabledFromEnv,
 
 		ChannelIDs:         EVENTS_CHANNEL_IDS,
 		RequireAdmin:       EVENTS_REQUIRE_ADMIN,
