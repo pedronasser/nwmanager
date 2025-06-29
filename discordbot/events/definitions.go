@@ -162,20 +162,20 @@ var (
 	}
 )
 
-func getEventTypeName(eventType types.EventType) string {
-	if name, ok := EventTypeNames[eventType]; ok {
+func getEventTypeName(config *EventsConfig, eventType types.EventType) string {
+	if name, ok := config.EventTypeNames[eventType]; ok {
 		return fmt.Sprintf("%s %s", EventTypeEmojis[eventType], name)
 	}
 
 	return ""
 }
 
-func getEventSlotCount(eventType types.EventType) int {
-	if slots, ok := EventSlots[eventType]; ok && slots == "" {
-		return EventSlotsCount[eventType]
+func getEventSlotCount(config *EventsConfig, eventType types.EventType) int {
+	if slots, ok := config.EventSlots[eventType]; ok && slots == "" {
+		return config.EventSlotsCount[eventType]
 	}
 
-	slots := EventSlots[eventType]
+	slots := config.EventSlots[eventType]
 	slotCount := 0
 	for _, slot := range slots {
 		if slot != ' ' {
@@ -186,9 +186,9 @@ func getEventSlotCount(eventType types.EventType) int {
 	return slotCount
 }
 
-func getEventFreeSlotsCount(event *types.Event) int {
-	if slots, ok := EventSlots[event.Type]; ok && slots == "" {
-		totalSlots := getEventSlotCount(event.Type)
+func getEventFreeSlotsCount(config *EventsConfig, event *types.Event) int {
+	if slots, ok := config.EventSlots[event.Type]; ok && slots == "" {
+		totalSlots := getEventSlotCount(config, event.Type)
 		return totalSlots - len(event.PlayerSlots)
 	} else {
 		freeSlots := 0
@@ -202,8 +202,8 @@ func getEventFreeSlotsCount(event *types.Event) int {
 	}
 }
 
-func getEventSlotsCountByRole(eventType types.EventType, role EventSlotRole) int {
-	slots := EventSlots[eventType]
+func getEventSlotsCountByRole(config *EventsConfig, eventType types.EventType, role EventSlotRole) int {
+	slots := config.EventSlots[eventType]
 	eventSlots := 0
 	for _, slot := range slots {
 		if slot == rune(role) {
@@ -214,8 +214,8 @@ func getEventSlotsCountByRole(eventType types.EventType, role EventSlotRole) int
 	return eventSlots
 }
 
-func getEventRoleByPosition(eventType types.EventType, position int) EventSlotRole {
-	slots := EventSlots[eventType]
+func getEventRoleByPosition(config *EventsConfig, eventType types.EventType, position int) EventSlotRole {
+	slots := config.EventSlots[eventType]
 	if position >= len(slots) {
 		return EventSlotAny
 	}
@@ -237,8 +237,8 @@ func getEventRoleByPosition(eventType types.EventType, position int) EventSlotRo
 	return EventSlotRole(role)
 }
 
-func getEventRoleNameByPosition(eventType types.EventType, position int) string {
-	slots := EventSlots[eventType]
+func getEventRoleNameByPosition(config *EventsConfig, eventType types.EventType, position int) string {
+	slots := config.EventSlots[eventType]
 	if position >= len(slots) {
 		return ""
 	}
@@ -257,15 +257,15 @@ func getEventRoleNameByPosition(eventType types.EventType, position int) string 
 		letters++
 	}
 
-	if roleName, ok := EventSlotRoleName[EventSlotRole(role)]; ok {
-		return EventSlotRoleEmoji[EventSlotRole(role)] + globals.SEPARATOR + roleName
+	if roleName, ok := config.EventSlotRoleName[EventSlotRole(role)]; ok {
+		return config.EventSlotRoleEmoji[EventSlotRole(role)] + globals.SEPARATOR + roleName
 	}
 
 	return ""
 }
 
-func resolveEventSlotFromEmoji(emoji string) EventSlotRole {
-	for role, emojiRole := range EventSlotRoleEmoji {
+func resolveEventSlotFromEmoji(config *EventsConfig, emoji string) EventSlotRole {
+	for role, emojiRole := range config.EventSlotRoleEmoji {
 		if emojiRole == emoji {
 			return role
 		}
@@ -285,13 +285,13 @@ func getEventFreeSlots(event *types.Event) []int {
 	return freeSlots
 }
 
-func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int {
+func getEventFreeSlotsByRole(config *EventsConfig, event *types.Event, targetRole EventSlotRole) []int {
 	freeSlots := []int{}
 	for i, slot := range event.PlayerSlots {
 		if slot != "" {
 			continue
 		}
-		role := getEventRoleByPosition(event.Type, i)
+		role := getEventRoleByPosition(config, event.Type, i)
 		if role == targetRole || role == EventSlotAny {
 			freeSlots = append(freeSlots, i)
 		}
@@ -300,11 +300,11 @@ func getEventFreeSlotsByRole(event *types.Event, targetRole EventSlotRole) []int
 	return freeSlots
 }
 
-func getEventSlotTypes(event *types.Event) []EventSlotRole {
+func getEventSlotTypes(config *EventsConfig, event *types.Event) []EventSlotRole {
 	slotTypes := []EventSlotRole{}
 
 	for i := range event.PlayerSlots {
-		role := getEventRoleByPosition(event.Type, i)
+		role := getEventRoleByPosition(config, event.Type, i)
 		if role == EventSlotAny {
 			continue
 		}

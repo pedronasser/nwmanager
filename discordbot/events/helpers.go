@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
+func buildEventMessage(config *EventsConfig, event *types.Event) *discordgo.MessageEmbed {
 	desc := ""
 
 	if event.Description != "" {
@@ -34,11 +34,11 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 		Inline: true,
 	})
 
-	slotsCount := getEventSlotCount(event.Type)
+	slotsCount := getEventSlotCount(config, event.Type)
 	if slotsCount != -1 {
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   "Vagas",
-			Value:  fmt.Sprintf("%d/%d", getEventFreeSlotsCount(event), slotsCount),
+			Value:  fmt.Sprintf("%d/%d", getEventFreeSlotsCount(config, event), slotsCount),
 			Inline: true,
 		})
 	}
@@ -73,7 +73,7 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 		}
 
 		if EventSlots[event.Type] != "" {
-			role := getEventRoleNameByPosition(event.Type, i)
+			role := getEventRoleNameByPosition(config, event.Type, i)
 			playerName := "_[ABERTO]_"
 			if player != "" {
 				playerName = fmt.Sprintf("<@%s>", player)
@@ -98,7 +98,7 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 	// }
 
 	embed := &discordgo.MessageEmbed{
-		Title:       getEventTitle(event),
+		Title:       getEventTitle(config, event),
 		Description: desc,
 		// Footer: &discordgo.MessageEmbedFooter{
 		// 	Text: footer,
@@ -114,8 +114,9 @@ func buildEventMessage(event *types.Event) *discordgo.MessageEmbed {
 }
 
 func addPlayerToEvent(ctx *common.ModuleContext, userId string, event *types.Event, slotType EventSlotRole) error {
+	config := GetModuleConfig(ctx)
 	if EventSlots[event.Type] != "" {
-		freeSlots := getEventFreeSlotsByRole(event, slotType)
+		freeSlots := getEventFreeSlotsByRole(config, event, slotType)
 		if len(freeSlots) == 0 {
 			return errors.New("Não há vagas disponíveis para a função escolhida.")
 		}
@@ -165,11 +166,13 @@ func removePlayerFromEvent(ctx *common.ModuleContext, userId string, event *type
 }
 
 func updateEventPlayerRole(ctx *common.ModuleContext, u *discordgo.User, event *types.Event, slotType EventSlotRole) error {
+	config := GetModuleConfig(ctx)
+
 	if EventSlots[event.Type] == "" {
 		return errors.New("Este evento não possui slots de função.")
 	}
 
-	freeSlots := getEventFreeSlotsByRole(event, slotType)
+	freeSlots := getEventFreeSlotsByRole(config, event, slotType)
 	if len(freeSlots) == 0 {
 		return errors.New("Não há vagas disponíveis para a função escolhida.")
 	}
@@ -197,6 +200,7 @@ func updateEventPlayerRole(ctx *common.ModuleContext, u *discordgo.User, event *
 }
 
 func updateEventMessage(ctx *common.ModuleContext, event *types.Event) error {
+	config := GetModuleConfig(ctx)
 	events_channel, err := ctx.Session().Channel(event.ChannelID)
 	if err != nil {
 		return fmt.Errorf("Cannot get events channel: %v", err)
@@ -207,7 +211,7 @@ func updateEventMessage(ctx *common.ModuleContext, event *types.Event) error {
 		return fmt.Errorf("Cannot get event message: %v", err)
 	}
 
-	_, err = ctx.Session().ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(event))
+	_, err = ctx.Session().ChannelMessageEditEmbed(events_channel.ID, message.ID, buildEventMessage(config, event))
 	if err != nil {
 		return fmt.Errorf("Cannot edit event message: %v", err)
 	}
@@ -216,6 +220,7 @@ func updateEventMessage(ctx *common.ModuleContext, event *types.Event) error {
 }
 
 func createEvent(ctx *common.ModuleContext, i *discordgo.InteractionCreate, tipo types.EventType, channel_id, title, description string, scheduledAt *time.Time, isInviteOnly bool) error {
+	config := GetModuleConfig(ctx)
 	event := types.Event{
 		ID:           primitive.NewObjectID(),
 		Title:        title,
@@ -231,7 +236,7 @@ func createEvent(ctx *common.ModuleContext, i *discordgo.InteractionCreate, tipo
 	}
 
 	if EventSlots[event.Type] != "" {
-		for range getEventSlotCount(event.Type) {
+		for range getEventSlotCount(config, event.Type) {
 			event.PlayerSlots = append(event.PlayerSlots, "")
 		}
 	} else {
@@ -259,6 +264,7 @@ func createEvent(ctx *common.ModuleContext, i *discordgo.InteractionCreate, tipo
 }
 
 func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Channel, event *types.Event) (*discordgo.Message, error) {
+	config := GetModuleConfig(ctx)
 	components := []discordgo.MessageComponent{}
 
 	joinActionsRow := discordgo.ActionsRow{
@@ -267,7 +273,7 @@ func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Cha
 
 	btnLength := 0
 
-	for _, slot := range getEventSlotTypes(event) {
+	for _, slot := range getEventSlotTypes(config, event) {
 		if btnLength == 4 {
 			components = append(components, joinActionsRow)
 			joinActionsRow = discordgo.ActionsRow{
@@ -323,7 +329,7 @@ func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Cha
 		},
 	)
 
-	eventMessage := buildEventMessage(event)
+	eventMessage := buildEventMessage(config, event)
 	message, err := ctx.Session().ChannelMessageSendComplex(events_channel.ID,
 		&discordgo.MessageSend{
 			Embed:      eventMessage,
@@ -404,8 +410,8 @@ func ownerHasEvent(ctx *common.ModuleContext, owner *discordgo.User) bool {
 	return true
 }
 
-func getEventTitle(event *types.Event) string {
-	title := fmt.Sprintf("%s - %s", getEventTypeName(event.Type), event.Title)
+func getEventTitle(config *EventsConfig, event *types.Event) string {
+	title := fmt.Sprintf("%s - %s", getEventTypeName(config, event.Type), event.Title)
 	if event.ScheduledAt != nil {
 		title += fmt.Sprintf(" (%s)", (*event.ScheduledAt).Format("02/01/2006 às 15:04"))
 	}
@@ -419,6 +425,7 @@ func sendJoinRequest(
 	user *discordgo.User,
 	slotType EventSlotRole,
 ) error {
+	config := GetModuleConfig(ctx)
 	channel, err := ctx.Session().UserChannelCreate(event.Owner)
 	if err != nil {
 		return err
@@ -426,9 +433,9 @@ func sendJoinRequest(
 
 	var content string
 	if slotType == EventSlotAny {
-		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(event))
+		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(config, event))
 	} else {
-		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s** como **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(event), EventSlotRoleName[slotType])
+		content = fmt.Sprintf("O jogador <@%s> solicitou participar do evento **%s** como **%s**. Você pode aprovar ou rejeitar a solicitação.", user.ID, getEventTitle(config, event), EventSlotRoleName[slotType])
 	}
 
 	_, err = ctx.Session().ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{

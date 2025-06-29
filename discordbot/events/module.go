@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/joho/godotenv"
 )
 
 const ModuleName = "events"
@@ -31,6 +30,7 @@ type EventsConfig struct {
 	EventSlotRoleName  map[EventSlotRole]string     `json:"event_slot_role_name"`
 	EventSlotRoleEmoji map[EventSlotRole]string     `json:"event_slot_role_emoji"`
 	EventTypeOptions   []common.EventSelectorOption `json:"event_type_options"`
+	EventTypeNames     map[types.EventType]string   `json:"event_type_names"`
 	EventNameMap       map[types.EventType]string   `json:"event_name_map"`
 }
 
@@ -51,22 +51,7 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 
 	dg := ctx.Session()
 
-	_ = godotenv.Load()
-	EVENTS_CHANNEL_IDS = strings.Split(os.Getenv("EVENTS_CHANNEL_IDS"), ",")
-	if len(EVENTS_CHANNEL_IDS) == 0 {
-		fmt.Println("EVENTS_CHANNEL_IDS is not set")
-		os.Exit(1)
-	}
-
-	if os.Getenv("EVENTS_REQUIRE_ADMIN") != "" {
-		EVENTS_REQUIRE_ADMIN = true
-	}
-
-	if v := os.Getenv("EVENTS_GUIDE_MESSAGE"); v != "" {
-		EVENTS_GUIDE_MESSAGE = v == "true"
-	}
-
-	for _, channel_id := range EVENTS_CHANNEL_IDS {
+	for _, channel_id := range cfg.ChannelIDs {
 		_, err := setupEventsChannel(ctx, channel_id)
 		if err != nil {
 			log.Printf("Cannot setup events channel %s: %v", channel_id, err)
@@ -109,12 +94,22 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 }
 
 func (s *EventsModule) DefaultConfig() any {
+	EVENTS_CHANNEL_IDS = strings.Split(os.Getenv("EVENTS_CHANNEL_IDS"), ",")
+
+	if os.Getenv("EVENTS_REQUIRE_ADMIN") != "" {
+		EVENTS_REQUIRE_ADMIN = true
+	}
+
+	if v := os.Getenv("EVENTS_GUIDE_MESSAGE"); v != "" {
+		EVENTS_GUIDE_MESSAGE = v == "true"
+	}
+
 	return &EventsConfig{
 		Enabled: true,
 
-		ChannelIDs:         []string{},
-		RequireAdmin:       false,
-		GuideMessage:       true,
+		ChannelIDs:         EVENTS_CHANNEL_IDS,
+		RequireAdmin:       EVENTS_REQUIRE_ADMIN,
+		GuideMessage:       EVENTS_GUIDE_MESSAGE,
 		ChannelName:        "",
 		InitMessage:        EVENTS_CHANNEL_INIT_MESSAGE,
 		EventTypeEmojis:    EventTypeEmojis,
@@ -123,6 +118,7 @@ func (s *EventsModule) DefaultConfig() any {
 		EventSlotRoleName:  EventSlotRoleName,
 		EventSlotRoleEmoji: EventSlotRoleEmoji,
 		EventTypeOptions:   EVENT_TYPE_OPTIONS,
+		EventTypeNames:     EventTypeNames,
 		EventNameMap: map[types.EventType]string{
 			types.EventTypeDungeonNormal: EventNameDungeonNormal,
 			types.EventTypeDungeonM1:     EventNameDungeonM1,
@@ -137,4 +133,11 @@ func (s *EventsModule) DefaultConfig() any {
 			types.EventTypeWar:           EventNameWar,
 		},
 	}
+}
+
+func GetModuleConfig(ctx *common.ModuleContext) *EventsConfig {
+	if module, ok := ctx.Config(ModuleName).(*EventsConfig); ok {
+		return module
+	}
+	return nil
 }

@@ -114,3 +114,10 @@ func (s *GlobalsModule) DefaultConfig() any {
 		DBPrefix:    DB_PREFIX,
 	}
 }
+
+func GetModuleConfig(ctx *common.ModuleContext) *GlobalsConfig {
+	if module, ok := ctx.Config(ModuleName).(*GlobalsConfig); ok {
+		return module
+	}
+	return nil
+}

@@ -19,7 +19,8 @@ import (
 
 var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
 	"/evento": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-		if !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
+		cfg := GetModuleConfig(ctx)
+		if !slices.Contains(cfg.ChannelIDs, i.ChannelID) {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este comando só pode ser usado em canal de eventos.", 5*time.Second)
 			return
 		}
@@ -409,6 +410,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 var EventsData = map[string]*types.Event{}
 
 func HandleMessages(ctx *common.ModuleContext, GuildID string) func(s *discordgo.Session, i *discordgo.MessageCreate) {
+	cfg := GetModuleConfig(ctx)
 	return func(s *discordgo.Session, i *discordgo.MessageCreate) {
 		if GuildID != i.GuildID {
 			return
@@ -418,15 +420,16 @@ func HandleMessages(ctx *common.ModuleContext, GuildID string) func(s *discordgo
 			return
 		}
 
-		if slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
+		if slices.Contains(cfg.ChannelIDs, i.ChannelID) {
 			_ = s.ChannelMessageDelete(i.ChannelID, i.ID)
 		}
 	}
 }
 
 func HandleEventAction(ctx *common.ModuleContext, GuildID string) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	cfg := GetModuleConfig(ctx)
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if GuildID != i.GuildID || !slices.Contains(EVENTS_CHANNEL_IDS, i.ChannelID) {
+		if GuildID != i.GuildID || !slices.Contains(cfg.ChannelIDs, i.ChannelID) {
 			return
 		}
 

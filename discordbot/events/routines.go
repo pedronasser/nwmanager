@@ -23,6 +23,7 @@ var (
 )
 
 func eventsCheckRoutine(ctx *common.ModuleContext) {
+	config := GetModuleConfig(ctx)
 	// Cleanup completed events
 	ticker := time.NewTicker(EVENT_CHECK_INTERVAL)
 	for {
@@ -58,7 +59,7 @@ func eventsCheckRoutine(ctx *common.ModuleContext) {
 					go func(dg *discordgo.Session) {
 						for _, player := range event.PlayerSlots {
 							if player != "" {
-								discordutils.SendMemberDM(dg, player, fmt.Sprintf("O evento **%s** em que você se inscreveu está agendado para iniciar em **15 minutos**. Verifique o canal de eventos para mais informações.", fmt.Sprintf("%s - %s", getEventTypeName(event.Type), event.Title)))
+								discordutils.SendMemberDM(dg, player, fmt.Sprintf("O evento **%s** em que você se inscreveu está agendado para iniciar em **15 minutos**. Verifique o canal de eventos para mais informações.", fmt.Sprintf("%s - %s", getEventTypeName(config, event.Type), event.Title)))
 							}
 						}
 					}(ctx.Session())
