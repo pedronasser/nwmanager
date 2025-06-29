@@ -36,14 +36,14 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 
 	// dg.State.TrackChannels = true
 	// dg.State.TrackRoles = true
-	// guild, err := dg.Guild(GuildID)
-	// if err != nil {
-	// 	log.Fatalf("Cannot get guild: %v", err)
-	// }
-	// err = dg.State.GuildAdd(guild)
-	// if err != nil {
-	// 	log.Fatalf("Cannot add guild to state: %v", err)
-	// }
+	guild, err := dg.Guild(cfg.GuildID)
+	if err != nil {
+		log.Fatalf("Cannot get guild: %v", err)
+	}
+	err = dg.State.GuildAdd(guild)
+	if err != nil {
+		log.Fatalf("Cannot add guild to state: %v", err)
+	}
 
 	// dg.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 	// 	for _, guild := range r.Guilds {
@@ -59,11 +59,6 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 
 	DB_PREFIX = cfg.DBPrefix
 	ADMIN_ROLE_ID = cfg.AdminRoleID
-
-	guild, err := dg.State.Guild(cfg.GuildID)
-	if err != nil {
-		log.Fatalf("Cannot get guild: %v", err)
-	}
 
 	for roleName := range ACCESS_ROLE_IDS {
 		role := GetRoleByName(guild, roleName)
