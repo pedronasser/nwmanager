@@ -77,7 +77,7 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 
 	dg.ApplicationCommandDelete(global.AppID, global.GuildID, "encerrar")
 
-	dg.AddHandler(HandleMessages(ctx, global.GuildID))
+	// dg.AddHandler(HandleMessages(ctx, global.GuildID))
 	dg.AddHandler(HandleEventAction(ctx, global.GuildID))
 
 	go eventsCheckRoutine(ctx)
