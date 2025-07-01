@@ -58,7 +58,7 @@ func Setup(ctx context.Context, dg *discordgo.Session, AppID, GuildID *string, d
 	// 	log.Fatalf("Cannot create slash command: %v", err)
 	// }
 
-	dg.AddHandler(HandleMessages(*GuildID, dg, db))
+	// dg.AddHandler(HandleMessages(*GuildID, dg, db))
 	dg.AddHandler(HandleEventClose(*GuildID, dg, db))
 
 	go eventsCheckRoutine(db, dg)
