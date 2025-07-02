@@ -80,9 +80,11 @@ func (m *ModuleManager) loadModulesConfig(ctx context.Context) (configs map[stri
 	}
 
 	var dbConfigs map[string]any
-	if err := result.Decode(&dbConfigs); err != nil {
-		log.Printf("Error decoding config for guild %s: %v", m.guildName, err)
-		return nil, fmt.Errorf("error decoding config for guild %s: %w", m.guildName, err)
+	if result.Err() == nil {
+		if err := result.Decode(&dbConfigs); err != nil {
+			log.Printf("Error decoding config for guild %s: %v", m.guildName, err)
+			return nil, fmt.Errorf("error decoding config for guild %s: %w", m.guildName, err)
+		}
 	}
 
 	configs = make(map[string]any)
@@ -124,7 +126,6 @@ func (m *ModuleManager) Run(ctx context.Context) {
 	}
 
 	for name, module := range m.modules {
-
 		configs := configs[name]
 		running, err := module.Setup(mctx, configs)
 		if err != nil {
