@@ -23,6 +23,7 @@ type EventsConfig struct {
 	GuideMessage bool     `json:"guide_message"`
 	ChannelName  string   `json:"channel_name"`
 	InitMessage  string   `json:"init_message"`
+	CreateThread bool     `json:"create_thread"`
 
 	EventTypeEmojis    map[types.EventType]string   `json:"event_type_emojis"`
 	EventSlots         map[types.EventType]string   `json:"event_slots"`

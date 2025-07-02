@@ -339,17 +339,19 @@ func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Cha
 		return nil, fmt.Errorf("Cannot send event message: %v", err)
 	}
 
-	thread_channel, err := ctx.Session().MessageThreadStartComplex(events_channel.ID, message.ID, &discordgo.ThreadStart{
-		Name: eventMessage.Title,
-		Type: discordgo.ChannelTypeGuildPublicThread,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Cannot create thread for event: %v", err)
-	}
+	if config.CreateThread {
+		thread_channel, err := ctx.Session().MessageThreadStartComplex(events_channel.ID, message.ID, &discordgo.ThreadStart{
+			Name: eventMessage.Title,
+			Type: discordgo.ChannelTypeGuildPublicThread,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("Cannot create thread for event: %v", err)
+		}
 
-	_, err = ctx.Session().ChannelMessageSend(thread_channel.ID, fmt.Sprintf("Este é o canal de discussão do evento **%s**. Aqui você pode conversar com os participantes e tirar dúvidas.", eventMessage.Title))
-	if err != nil {
-		return nil, fmt.Errorf("Cannot send thread message: %v", err)
+		_, err = ctx.Session().ChannelMessageSend(thread_channel.ID, fmt.Sprintf("Este é o canal de discussão do evento **%s**. Aqui você pode conversar com os participantes e tirar dúvidas.", eventMessage.Title))
+		if err != nil {
+			return nil, fmt.Errorf("Cannot send thread message: %v", err)
+		}
 	}
 
 	return message, nil
