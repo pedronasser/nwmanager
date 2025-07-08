@@ -1,4 +1,4 @@
-package common
+package register
 
 const (
 	WEAPON_SWORD_SHIELD     = "sword_shield"
