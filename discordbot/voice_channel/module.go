@@ -13,13 +13,15 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const ModuleName = "voice_channel"
 const VOICE_CHANNEL_COMMAND_CREATE = "vc-setup"
 
 type VoiceChannelConfig struct {
-	Enabled bool `json:"enabled"`
+	Enabled  bool     `json:"enabled"`
+	Creators []string `json:"creators"` // List of voice channel creator IDs
 }
 
 type VoiceChannelModule struct{}
@@ -99,24 +101,30 @@ func setupVoiceChannelCreators(ctx *common.ModuleContext) {
 				}
 			}
 		})
+	}
 
-		ds.ApplicationCommandCreate(globalCfg.AppID, globalCfg.GuildID, &discordgo.ApplicationCommand{
-			Name:        VOICE_CHANNEL_COMMAND_CREATE,
-			Description: "Cria um novo canal de voz para você",
-			Type:        discordgo.ChatApplicationCommand,
-		})
+	_, err = ds.ApplicationCommandCreate(globalCfg.AppID, globalCfg.GuildID, &discordgo.ApplicationCommand{
+		Name:        VOICE_CHANNEL_COMMAND_CREATE,
+		Description: "Cria um novo canal de voz para você",
+		Type:        discordgo.ChatApplicationCommand,
+	})
+	if err != nil {
+		log.Printf("Failed to create application command for voice channel creator: %v\n", err)
+	}
 
-		ds.AddHandler(func(s *discordgo.Session, ic *discordgo.InteractionCreate) {
-			if ic.Type != discordgo.InteractionApplicationCommand {
+	ds.AddHandler(func(s *discordgo.Session, ic *discordgo.InteractionCreate) {
+		if ic.Type != discordgo.InteractionApplicationCommand {
+			return
+		}
+
+		if ic.ApplicationCommandData().Name == VOICE_CHANNEL_COMMAND_CREATE {
+			_, err := createVoiceChannelCreator(ctx)
+			if err != nil {
+				log.Printf("Failed to create voice channel creator: %v\n", err)
 				return
 			}
-
-			if ic.ApplicationCommandData().Name == VOICE_CHANNEL_COMMAND_CREATE {
-
-			}
-		})
-
-	}
+		}
+	})
 }
 
 func createNewVoiceChannel(ctx *common.ModuleContext, ownerID string) (*discordgo.Channel, error) {
@@ -138,10 +146,32 @@ func createNewVoiceChannel(ctx *common.ModuleContext, ownerID string) (*discordg
 func createVoiceChannelCreator(ctx *common.ModuleContext) (*discordgo.Channel, error) {
 	globalCfg := globals.GetModuleConfig(ctx)
 	ds := ctx.Session()
+	db := ctx.DB()
 
 	channel, err := ds.GuildChannelCreate(globalCfg.GuildID, "Criar Canal de Voz", discordgo.ChannelTypeGuildVoice)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create voice channel creator: %w", err)
+	}
+
+	opts := options.Update().SetUpsert(true)
+	res, err := db.Collection(common.ConfigCollectionName).UpdateOne(ctx.Context, bson.M{"_id": globalCfg.GuildID}, bson.M{
+		"$push": bson.M{
+			"voice_channels.creators": channel.ID,
+		},
+	}, opts)
+	voiceConfig := GetModuleConfig(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update voice channel creators in database: %w", err)
+	}
+
+	voiceConfig.Creators = append(voiceConfig.Creators, channel.ID)
+	// TODO: Figure out better way to update the config in the context
+	// and let the config be updated automatically
+	// It must be thread-safe
+
+	if res.MatchedCount == 0 {
+		return nil, fmt.Errorf("no matching guild found in database for ID %s", globalCfg.GuildID)
 	}
 
 	return channel, nil
