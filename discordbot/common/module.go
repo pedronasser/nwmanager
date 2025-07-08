@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+const ConfigCollectionName = "config"
+
 var (
 	ErrModuleAlreadyExists = errors.New("module already exists")
 )
@@ -72,8 +74,8 @@ func (m *ModuleManager) RegisterModule(name string, module Module[any]) error {
 // and returns a map of module names to their configurations.
 func (m *ModuleManager) loadModulesConfig(ctx context.Context) (configs map[string]any, err error) {
 	// Load configs from db
-	result := m.db.Collection("config").FindOne(ctx, bson.M{
-		"guild": m.guildName,
+	result := m.db.Collection(ConfigCollectionName).FindOne(ctx, bson.M{
+		"_id": m.guildName,
 	})
 	if result.Err() != nil {
 		log.Printf("Failed to load %s config from database: %v", m.guildName, result.Err())
