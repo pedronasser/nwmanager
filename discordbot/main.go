@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"nwmanager/database"
+	"nwmanager/discordbot/admin_commands"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/events"
 	"nwmanager/discordbot/globals"
@@ -54,6 +55,7 @@ func main() {
 	ml.RegisterModule(register.ModuleName, &register.RegisterModule{})
 	ml.RegisterModule(events.ModuleName, &events.EventsModule{})
 	ml.RegisterModule(voice_channel.ModuleName, &voice_channel.VoiceChannelModule{})
+	ml.RegisterModule(admin_commands.ModuleName, &admin_commands.AdminCommandsModule{})
 
 	ml.Run(ctx)
 
