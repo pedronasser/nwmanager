@@ -100,6 +100,56 @@ func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
 	return err
 }
 
+// cleanupExistingRegistrationChannels finds and deletes any existing channels with the same registration name
+func cleanupExistingRegistrationChannels(dg *discordgo.Session, guildID, channelName, categoryID string) error {
+	// Get all channels in the guild
+	channels, err := dg.GuildChannels(guildID)
+	if err != nil {
+		return fmt.Errorf("error fetching guild channels: %v", err)
+	}
+
+	// Look for channels with the same name
+	for _, channel := range channels {
+		// Only check text channels
+		if channel.Type != discordgo.ChannelTypeGuildText {
+			continue
+		}
+
+		// If a category is specified, only check channels in that category
+		if categoryID != "" && channel.ParentID != categoryID {
+			continue
+		}
+
+		// If channel name matches, delete it
+		if channel.Name == channelName {
+			log.Printf("Found existing registration channel '%s' (ID: %s), deleting...", channel.Name, channel.ID)
+
+			// Clean up any registration state that might reference this channel
+			cleanupRegistrationStateByChannelID(channel.ID)
+
+			_, err := dg.ChannelDelete(channel.ID)
+			if err != nil {
+				log.Printf("Error deleting existing registration channel %s: %v", channel.ID, err)
+				// Continue trying to delete other channels even if one fails
+			} else {
+				log.Printf("Successfully deleted existing registration channel '%s'", channel.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// cleanupRegistrationStateByChannelID removes any registration state that references the given channel ID
+func cleanupRegistrationStateByChannelID(channelID string) {
+	for userID, state := range RegisterData {
+		if state.TopicID == channelID {
+			log.Printf("Cleaning up orphaned registration state for user %s (channel: %s)", userID, channelID)
+			delete(RegisterData, userID)
+		}
+	}
+}
+
 func handleWelcomeChannelMessage(ctx *common.ModuleContext, s *discordgo.Session, m *discordgo.MessageCreate) {
 	cfg := GetModuleConfig(ctx)
 
@@ -140,6 +190,13 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Create private text channel for registration
 	channelName := fmt.Sprintf("registro-%s", strings.ToLower(i.Member.User.Username))
+
+	// Check for existing registration channels with the same name and delete them
+	err := cleanupExistingRegistrationChannels(dg, i.GuildID, channelName, cfg.RegistrationCategoryID)
+	if err != nil {
+		log.Printf("Error cleaning up existing registration channels: %v", err)
+		// Continue with creation despite cleanup errors
+	}
 
 	// Determine parent category
 	var parentID string
@@ -235,7 +292,7 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 	state.Step = STEP_TIMES
 
 	// Reply to interaction first
-	go discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Classes selecionadas com sucesso!", 5*time.Second)
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Classes selecionadas com sucesso!", 1*time.Second)
 
 	// Then ask for available times
 	askForTimes(ctx, state.TopicID, i.Member.User.ID)
@@ -244,9 +301,10 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 func askForTimes(ctx *common.ModuleContext, channelID, userID string) {
 	dg := ctx.Session()
 
-	// Create time options from constants
+	// Create time options from constants using ordered array
 	var timeOptions []discordgo.SelectMenuOption
-	for timeKey, timeName := range TIMES {
+	for _, timeKey := range TIME_OPTIONS {
+		timeName := TIMES[timeKey]
 		timeOptions = append(timeOptions, discordgo.SelectMenuOption{
 			Label: timeName,
 			Value: timeKey,
@@ -295,7 +353,7 @@ func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 	state.Step = STEP_WEEKDAYS
 
 	// Reply to interaction first
-	go discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Horários selecionados com sucesso!", 5*time.Second)
+	go discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Horários selecionados com sucesso!", 1*time.Second)
 
 	// Then ask for weekdays
 	askForWeekdays(ctx, state.TopicID, i.Member.User.ID)
@@ -304,9 +362,10 @@ func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 func askForWeekdays(ctx *common.ModuleContext, channelID, userID string) {
 	dg := ctx.Session()
 
-	// Create weekday options from constants
+	// Create weekday options from constants using ordered array
 	var weekdayOptions []discordgo.SelectMenuOption
-	for weekdayKey, weekdayName := range WEEKDAYS {
+	for _, weekdayKey := range WEEKDAY_OPTIONS {
+		weekdayName := WEEKDAYS[weekdayKey]
 		weekdayOptions = append(weekdayOptions, discordgo.SelectMenuOption{
 			Label: weekdayName,
 			Value: weekdayKey,
@@ -382,7 +441,7 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 	}
 
 	// Reply to interaction first
-	go discordutils.ReplyEphemeralMessage(dg, i, "✅ Dias selecionados com sucesso!", 5*time.Second)
+	discordutils.ReplyEphemeralMessage(dg, i, "✅ Dias selecionados com sucesso!", 1*time.Second)
 
 	// Send completion message with admin approval buttons
 	sendCompletionMessage(ctx, state, registration)
@@ -398,7 +457,11 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 	var classNames []string
 	for _, class := range state.PVPClasses {
 		if name, exists := PVP_CLASSES[class]; exists {
-			classNames = append(classNames, name)
+			if emoji, emojiExists := PVP_CLASSES_EMOJI[class]; emojiExists {
+				classNames = append(classNames, fmt.Sprintf("%s %s", emoji, name))
+			} else {
+				classNames = append(classNames, name)
+			}
 		}
 	}
 
@@ -718,6 +781,17 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 			log.Printf("Error assigning member role to user %s: %v", registration.DiscordID, err)
 		} else {
 			log.Printf("Successfully assigned member role to user %s", registration.DiscordID)
+		}
+	}
+
+	// Change member nickname to their IGN
+	if guildID != "" {
+		dg := ctx.Session()
+		err = dg.GuildMemberNickname(guildID, registration.DiscordID, registration.InGameName)
+		if err != nil {
+			log.Printf("Error changing nickname for user %s to %s: %v", registration.DiscordID, registration.InGameName, err)
+		} else {
+			log.Printf("Successfully changed nickname for user %s to %s", registration.DiscordID, registration.InGameName)
 		}
 	}
 

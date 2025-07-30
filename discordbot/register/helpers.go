@@ -59,12 +59,17 @@ func handleIGNInput(ctx *common.ModuleContext, state *RegistrationState, m *disc
 func askForClasses(ctx *common.ModuleContext, channelID, userID string) error {
 	dg := ctx.Session()
 
-	// Create class options from constants
+	// Create class options from constants using ordered array
 	var classOptions []discordgo.SelectMenuOption
-	for classKey, className := range PVP_CLASSES {
+	for _, classKey := range PVP_CLASS_OPTIONS {
+		className := PVP_CLASSES[classKey]
+		classEmoji := PVP_CLASSES_EMOJI[classKey]
 		classOptions = append(classOptions, discordgo.SelectMenuOption{
 			Label: className,
 			Value: classKey,
+			Emoji: &discordgo.ComponentEmoji{
+				Name: classEmoji,
+			},
 		})
 	}
 
