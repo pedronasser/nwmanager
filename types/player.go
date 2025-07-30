@@ -16,13 +16,16 @@ import (
 const PlayerCollection = "players"
 
 type Player struct {
-	ID            primitive.ObjectID `json:"id" bson:"_id"`
-	DiscordID     string             `json:"discord_id" bson:"discord_id"`
-	IGN           string             `json:"ign" bson:"ign"`
-	WarClass      string             `json:"war_class" bson:"war_class"`
-	TicketChannel string             `json:"ticket_channel" bson:"ticket_channel"`
-	RegisteredAt  *time.Time         `json:"registered_at" bson:"registered_at"`
-	ArchivedAt    *time.Time         `json:"archived_at" bson:"archived_at"`
+	ID                primitive.ObjectID `json:"id" bson:"_id"`
+	DiscordID         string             `json:"discord_id" bson:"discord_id"`
+	IGN               string             `json:"ign" bson:"ign"`
+	WarClass          []string           `json:"war_class" bson:"war_class"`
+	PVPClasses        []string           `json:"pvp_classes" bson:"pvp_classes"`
+	AvailableTimes    []string           `json:"available_times" bson:"available_times"`
+	AvailableWeekdays []string           `json:"available_weekdays" bson:"available_weekdays"`
+	TicketChannel     string             `json:"ticket_channel" bson:"ticket_channel"`
+	RegisteredAt      *time.Time         `json:"registered_at" bson:"registered_at"`
+	ArchivedAt        *time.Time         `json:"archived_at" bson:"archived_at"`
 
 	Stats *PlayerStats `json:"stats" bson:"stats"`
 }

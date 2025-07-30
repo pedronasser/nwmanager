@@ -1,22 +1,17 @@
 package register
 
 const (
-	WEAPON_SWORD_SHIELD     = "sword_shield"
-	WEAPON_TWO_HANDED_SWORD = "two_handed_sword"
-	WEAPON_BOW              = "bow"
-	WEAPON_AXE              = "axe"
-	WEAPON_STAFF            = "staff"
-	WEAPON_DAGGER           = "dagger"
-	WEAPON_WAND             = "wand"
+	// User can select multiple classes
+	PVP_CLASS_DISRUPTOR = "disruptor"
+	PVP_CLASS_HEALER    = "healer"
+	PVP_CLASS_TANK      = "tank"
+	PVP_CLASS_FIRE      = "fire"
+	PVP_CLASS_ICE_FLAIL = "ice_flail"
+	PVP_CLASS_BRUISER   = "bruiser"
+	PVP_CLASS_BOW       = "bow"
+	PVP_CLASS_ASSASSIN  = "assassin"
 
-	WEAPON_NAME_SWORD_SHIELD     = "Espada e Escudo"
-	WEAPON_NAME_TWO_HANDED_SWORD = "Espada de duas mãos"
-	WEAPON_NAME_BOW              = "Arco"
-	WEAPON_NAME_AXE              = "Machado"
-	WEAPON_NAME_STAFF            = "Cajado"
-	WEAPON_NAME_DAGGER           = "Adaga"
-	WEAPON_NAME_WAND             = "Varinha"
-
+	// User can select multiple times
 	TIME_MORNING   = "morning"
 	TIME_AFTERNOON = "afternoon"
 	TIME_18        = "18"
@@ -37,6 +32,7 @@ const (
 	TIME_NAME_23        = "23h-00h"
 	TIME_NAME_DAWN      = "Madrugada"
 
+	// User can select multiple weekdays
 	WEEKDAY_MONDAY    = "monday"
 	WEEKDAY_TUESDAY   = "tuesday"
 	WEEKDAY_WEDNESDAY = "wednesday"
@@ -55,14 +51,15 @@ const (
 )
 
 var (
-	WEAPONS = map[string]string{
-		WEAPON_SWORD_SHIELD:     WEAPON_NAME_SWORD_SHIELD,
-		WEAPON_TWO_HANDED_SWORD: WEAPON_NAME_TWO_HANDED_SWORD,
-		WEAPON_BOW:              WEAPON_NAME_BOW,
-		WEAPON_AXE:              WEAPON_NAME_AXE,
-		WEAPON_STAFF:            WEAPON_NAME_STAFF,
-		WEAPON_DAGGER:           WEAPON_NAME_DAGGER,
-		WEAPON_WAND:             WEAPON_NAME_WAND,
+	PVP_CLASSES = map[string]string{
+		PVP_CLASS_DISRUPTOR: "Disruptor",
+		PVP_CLASS_HEALER:    "Healer",
+		PVP_CLASS_TANK:      "Tank",
+		PVP_CLASS_FIRE:      "Fire",
+		PVP_CLASS_ICE_FLAIL: "Ice Flail",
+		PVP_CLASS_BRUISER:   "Bruiser",
+		PVP_CLASS_BOW:       "Bow",
+		PVP_CLASS_ASSASSIN:  "Assassin",
 	}
 
 	TIMES = map[string]string{
