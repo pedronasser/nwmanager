@@ -1,6 +1,7 @@
 package register
 
 import (
+	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
@@ -15,7 +16,6 @@ const ModuleName = "register"
 type RegisterConfig struct {
 	Enabled                bool   `json:"enabled"`
 	WelcomeChannelID       string `json:"welcome_channel_id"`
-	AdminRoleID            string `json:"admin_role_id"`
 	MemberRoleID           string `json:"member_role_id"`
 	WelcomeMessage         string `json:"welcome_message"`
 	RegistrationCategoryID string `json:"registration_category_id"`
@@ -43,9 +43,11 @@ func (s *RegisterModule) Name() string {
 
 func (s *RegisterModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
 	var cfg = config.(*RegisterConfig)
+	fmt.Println(cfg)
 	if !cfg.Enabled {
 		return false, nil
 	}
+
 	log.Println("Register module is enabled, setting up...")
 
 	global, _ := ctx.Config("globals").(*globals.GlobalsConfig)
@@ -87,7 +89,6 @@ func (s *RegisterModule) DefaultConfig() any {
 	return &RegisterConfig{
 		Enabled:                IsModuleEnabledFromEnv,
 		WelcomeChannelID:       os.Getenv("WELCOME_CHANNEL_ID"),
-		AdminRoleID:            os.Getenv("ADMIN_ROLE_ID"),
 		MemberRoleID:           os.Getenv("MEMBER_ROLE_ID"),
 		WelcomeMessage:         welcomeMessage,
 		RegistrationCategoryID: os.Getenv("REGISTRATION_CATEGORY_ID"),

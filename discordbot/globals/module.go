@@ -13,12 +13,13 @@ import (
 const ModuleName = "globals"
 
 type GlobalsConfig struct {
+	// Env variables
 	AppID   string
 	GuildID string
 
-	AdminRoleID      string
-	DBPrefix         string
-	EveryoneRoleName string
+	// DB configurable values
+	AdminRoleID  string `json:"admin_role_id"`
+	MemberRoleID string `json:"member_role_id"`
 }
 
 type GlobalsModule struct {
@@ -49,7 +50,7 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 		log.Fatalf("Cannot add guild to state: %v", err)
 	}
 
-	DB_PREFIX = cfg.DBPrefix
+	DB_PREFIX = ctx.GuildName() + "_"
 	ADMIN_ROLE_ID = cfg.AdminRoleID
 
 	for roleName := range ACCESS_ROLE_IDS {
@@ -77,16 +78,15 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 func (s *GlobalsModule) DefaultConfig() any {
 	var AppID = os.Getenv("DISCORD_APP_ID")
 	var GuildID = os.Getenv("DISCORD_GUILD_ID")
-
-	DB_PREFIX = helpers.LoadOrDefault("DB_PREFIX", "")
 	ADMIN_ROLE_ID = helpers.LoadOrDefault("ADMIN_ROLE_ID", "")
+	MEMBER_ROLE_ID := helpers.LoadOrDefault("MEMBER_ROLE_ID", "")
 
 	return &GlobalsConfig{
 		AppID:   AppID,
 		GuildID: GuildID,
 
-		AdminRoleID: ADMIN_ROLE_ID,
-		DBPrefix:    DB_PREFIX,
+		AdminRoleID:  ADMIN_ROLE_ID,
+		MemberRoleID: MEMBER_ROLE_ID,
 	}
 }
 

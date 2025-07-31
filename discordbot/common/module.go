@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -18,10 +19,11 @@ var (
 )
 
 type ModuleContext struct {
-	Context context.Context
-	session *discordgo.Session
-	db      database.Database
-	configs map[string]any
+	Context   context.Context
+	session   *discordgo.Session
+	db        database.Database
+	configs   map[string]any
+	guildName string
 }
 
 func (ctx *ModuleContext) Session() *discordgo.Session {
@@ -38,6 +40,10 @@ func (ctx *ModuleContext) Config(moduleName string) any {
 		panic(fmt.Sprintf("Module %s config not found", moduleName))
 	}
 	return config
+}
+
+func (ctx *ModuleContext) GuildName() string {
+	return ctx.guildName
 }
 
 type Module[T any] interface {
@@ -95,13 +101,13 @@ func (m *ModuleManager) loadModulesConfig(ctx context.Context) (configs map[stri
 		configs[name] = config
 
 		if dbConfig, exists := dbConfigs[name]; exists {
-			data, err := bson.Marshal(dbConfig)
+			data, err := json.Marshal(dbConfig)
 			if err != nil {
 				log.Printf("Error marshalling config for module %s: %v", name, err)
 				continue
 			}
 
-			if err := bson.Unmarshal(data, &config); err != nil {
+			if err := json.Unmarshal(data, &config); err != nil {
 				log.Printf("Error unmarshalling config for module %s: %v", name, err)
 				continue
 			}
@@ -121,10 +127,11 @@ func (m *ModuleManager) Run(ctx context.Context) {
 	}
 
 	mctx := &ModuleContext{
-		Context: ctx,
-		session: m.session,
-		db:      m.db,
-		configs: configs,
+		Context:   ctx,
+		session:   m.session,
+		db:        m.db,
+		configs:   configs,
+		guildName: m.guildName,
 	}
 
 	for name, module := range m.modules {

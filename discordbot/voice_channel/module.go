@@ -62,7 +62,7 @@ func setupVoiceChannelCreators(ctx *common.ModuleContext) {
 	db := ctx.DB()
 
 	var voiceChannels []types.VoiceChannel
-	col := db.Collection(globalCfg.DBPrefix + types.VoiceChannelCollection)
+	col := db.Collection(globals.DB_PREFIX + types.VoiceChannelCollection)
 	cursor, err := col.Find(ctx.Context, bson.M{})
 	if err != nil {
 		log.Printf("Failed to retrieve voice channels from database: %v\n", err)

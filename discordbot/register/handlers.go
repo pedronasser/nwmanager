@@ -6,6 +6,7 @@ import (
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
 	"nwmanager/helpers"
 	"nwmanager/types"
 	"strings"
@@ -227,10 +228,11 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 		})
 	}
 
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 	// Add admin role permissions if configured
-	if cfg.AdminRoleID != "" {
+	if globalCfg.AdminRoleID != "" {
 		permissionOverwrites = append(permissionOverwrites, &discordgo.PermissionOverwrite{
-			ID:    cfg.AdminRoleID, // Admin role
+			ID:    globalCfg.AdminRoleID, // Admin role
 			Type:  discordgo.PermissionOverwriteTypeRole,
 			Allow: discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionReadMessageHistory,
 		})
@@ -554,7 +556,7 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 }
 
 func approveRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-	cfg := GetModuleConfig(ctx)
+	globalCfg := ctx.Config("globals").(*globals.GlobalsConfig)
 
 	// Extract registration ID from custom ID
 	parts := strings.Split(i.MessageComponentData().CustomID, ":")
@@ -566,7 +568,7 @@ func approveRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 	registrationID := parts[2]
 
 	// Check if user has admin permissions
-	if !hasAdminPermission(i.Member, cfg.AdminRoleID) {
+	if !hasAdminPermission(i.Member, globalCfg.AdminRoleID) {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para aprovar registros.", 5*time.Second)
 		return
 	}
@@ -621,7 +623,7 @@ func approveRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 }
 
 func rejectRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-	cfg := GetModuleConfig(ctx)
+	globalCfg := ctx.Config("globals").(*globals.GlobalsConfig)
 
 	// Extract registration ID from custom ID
 	parts := strings.Split(i.MessageComponentData().CustomID, ":")
@@ -633,7 +635,7 @@ func rejectRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreat
 	registrationID := parts[2]
 
 	// Check if user has admin permissions
-	if !hasAdminPermission(i.Member, cfg.AdminRoleID) {
+	if !hasAdminPermission(i.Member, globalCfg.AdminRoleID) {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para rejeitar registros.", 5*time.Second)
 		return
 	}
