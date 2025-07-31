@@ -81,11 +81,11 @@ func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
-					Label:    "Iniciar Registro",
+					Label:    "Iniciar Recrutamento",
 					Style:    discordgo.PrimaryButton,
 					CustomID: "btn:start_registration",
 					Emoji: &discordgo.ComponentEmoji{
-						Name: "🚀",
+						Name: "📝",
 					},
 				},
 			},
