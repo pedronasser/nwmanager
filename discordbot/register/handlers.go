@@ -429,7 +429,6 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 		Hours:      state.Times,
 		Weapons:    state.PVPClasses, // Using weapons field for PVP classes
 		CreatedAt:  time.Now(),
-		Approved:   false,
 	}
 
 	// Store in database (implement this based on your database layer)
