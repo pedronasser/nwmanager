@@ -1,7 +1,6 @@
 package globals
 
 import (
-	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/helpers"
@@ -20,6 +19,10 @@ type GlobalsConfig struct {
 	// DB configurable values
 	AdminRoleID  string `json:"admin_role_id"`
 	MemberRoleID string `json:"member_role_id"`
+
+	ClassRoleIDs     map[string]string `json:"class_role_ids"`
+	ClassEmojiIDs    map[string]string `json:"class_emoji_ids"`
+	ClassCategoryIDs map[string]string `json:"class_category_ids"`
 }
 
 type GlobalsModule struct {
@@ -53,25 +56,6 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 	DB_PREFIX = ctx.GuildName() + "_"
 	ADMIN_ROLE_ID = cfg.AdminRoleID
 
-	for roleName := range ACCESS_ROLE_IDS {
-		role := GetRoleByName(guild, roleName)
-		if role == nil {
-			fmt.Println("Role not found:", roleName)
-			continue
-		}
-		ACCESS_ROLE_IDS[roleName] = role.ID
-		fmt.Printf("Found Access Role %s: %s\n", roleName, role.ID)
-	}
-
-	for roleName := range CLASS_ROLE_IDS {
-		role := GetRoleByName(guild, roleName)
-		if role == nil {
-			continue
-		}
-		CLASS_ROLE_IDS[roleName] = role.ID
-		fmt.Printf("Found Class Role %s: %s\n", roleName, role.ID)
-	}
-
 	return true, nil
 }
 
@@ -87,6 +71,10 @@ func (s *GlobalsModule) DefaultConfig() any {
 
 		AdminRoleID:  ADMIN_ROLE_ID,
 		MemberRoleID: MEMBER_ROLE_ID,
+
+		ClassRoleIDs:     make(map[string]string),
+		ClassEmojiIDs:    make(map[string]string),
+		ClassCategoryIDs: make(map[string]string),
 	}
 }
 

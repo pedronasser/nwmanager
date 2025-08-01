@@ -16,7 +16,6 @@ const ModuleName = "register"
 type RegisterConfig struct {
 	Enabled                bool   `json:"enabled"`
 	WelcomeChannelID       string `json:"welcome_channel_id"`
-	MemberRoleID           string `json:"member_role_id"`
 	WelcomeMessage         string `json:"welcome_message"`
 	RegistrationCategoryID string `json:"registration_category_id"`
 }
@@ -101,7 +100,6 @@ func (s *RegisterModule) DefaultConfig() any {
 	return &RegisterConfig{
 		Enabled:                IsModuleEnabledFromEnv,
 		WelcomeChannelID:       os.Getenv("WELCOME_CHANNEL_ID"),
-		MemberRoleID:           os.Getenv("MEMBER_ROLE_ID"),
 		WelcomeMessage:         welcomeMessage,
 		RegistrationCategoryID: os.Getenv("REGISTRATION_CATEGORY_ID"),
 	}

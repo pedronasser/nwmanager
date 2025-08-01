@@ -184,7 +184,8 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 	}
 
 	// Check if user already has the member role (is already fully registered)
-	if cfg.MemberRoleID != "" && hasRole(i.Member, cfg.MemberRoleID) {
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
+	if globalCfg.MemberRoleID != "" && hasRole(i.Member, globalCfg.MemberRoleID) {
 		discordutils.ReplyEphemeralMessage(dg, i, "✅ Você já está registrado na guild!", 5*time.Second)
 		return
 	}
@@ -766,10 +767,10 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 	}
 
 	// Assign member role
-	cfg := GetModuleConfig(ctx)
-	if cfg.MemberRoleID != "" && guildID != "" {
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
+	if globalCfg.MemberRoleID != "" && guildID != "" {
 		dg := ctx.Session()
-		err = dg.GuildMemberRoleAdd(guildID, registration.DiscordID, cfg.MemberRoleID)
+		err = dg.GuildMemberRoleAdd(guildID, registration.DiscordID, globalCfg.MemberRoleID)
 		if err != nil {
 			log.Printf("Error assigning member role to user %s: %v", registration.DiscordID, err)
 		} else {
