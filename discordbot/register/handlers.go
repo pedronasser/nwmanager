@@ -229,7 +229,6 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 		})
 	}
 
-	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 	// Add admin role permissions if configured
 	if globalCfg.AdminRoleID != "" {
 		permissionOverwrites = append(permissionOverwrites, &discordgo.PermissionOverwrite{
