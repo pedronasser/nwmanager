@@ -26,15 +26,27 @@ type RegisterModule struct{}
 // Store ongoing registrations in memory
 var RegisterData = make(map[string]*RegistrationState)
 
+// Global step processor instance
+var stepProcessor *StepProcessor
+
 type RegistrationState struct {
-	DiscordID  string
-	TopicID    string // Registration channel ID
-	Step       int
-	IGN        string
-	PVPClasses []string
-	Times      []string
-	Weekdays   []string
-	MessageID  string
+	DiscordID     string
+	TopicID       string // Registration channel ID
+	Step          int    // Keep for backward compatibility
+	CurrentStepID string // New step ID for dynamic system
+	IGN           string
+	PVPClasses    []string
+	Times         []string
+	Weekdays      []string
+	MessageID     string
+}
+
+// GetStepProcessor returns the global step processor instance
+func GetStepProcessor() *StepProcessor {
+	if stepProcessor == nil {
+		stepProcessor = NewStepProcessor()
+	}
+	return stepProcessor
 }
 
 func (s *RegisterModule) Name() string {

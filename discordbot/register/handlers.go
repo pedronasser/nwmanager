@@ -252,52 +252,41 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Initialize registration state
 	RegisterData[i.Member.User.ID] = &RegistrationState{
-		DiscordID: i.Member.User.ID,
-		TopicID:   channel.ID,
-		Step:      STEP_IGN,
+		DiscordID:     i.Member.User.ID,
+		TopicID:       channel.ID,
+		Step:          STEP_IGN, // Keep for backward compatibility
+		CurrentStepID: "ign",    // New step-based system
 	}
 
-	// Send first step message
-	askForIGN(ctx, channel.ID, i.Member.User.ID)
+	// Start the first step using the new step processor
+	processor := GetStepProcessor()
+	err = processor.ProcessStep(ctx, RegisterData[i.Member.User.ID], "ign")
+	if err != nil {
+		log.Printf("Error processing first step: %v", err)
+		discordutils.ReplyEphemeralMessage(dg, i, "❌ Erro ao iniciar registro.", 5*time.Second)
+		return
+	}
 
 	// Reply to original interaction
 	discordutils.ReplyEphemeralMessage(dg, i, fmt.Sprintf("✅ Canal de registro criado: <#%s>", channel.ID), 10*time.Second)
 }
 
-func askForIGN(ctx *common.ModuleContext, channelID, userID string) {
-	dg := ctx.Session()
-
-	embed := &discordgo.MessageEmbed{
-		Title:       "📝 Registro - Passo 1/4",
-		Description: "**Qual é o seu nome no jogo (IGN)?**\n\nPor favor, digite seu nome exatamente como aparece no New World.",
-		Color:       0x0099ff,
-		Footer: &discordgo.MessageEmbedFooter{
-			Text: "Digite sua resposta na próxima mensagem",
-		},
-	}
-
-	_, err := dg.ChannelMessageSendEmbed(channelID, embed)
-	if err != nil {
-		log.Printf("Error sending IGN question: %v", err)
-	}
-}
-
 func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.Step != STEP_CLASSES {
+	if !exists || (state.Step != STEP_CLASSES && state.CurrentStepID != "pvp_classes") {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
 
-	// Store selected classes
-	state.PVPClasses = i.MessageComponentData().Values
-	state.Step = STEP_TIMES
-
 	// Reply to interaction first
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Classes selecionadas com sucesso!", 1*time.Second)
 
-	// Then ask for available times
-	askForTimes(ctx, state.TopicID, i.Member.User.ID)
+	// Handle using the new step system
+	processor := GetStepProcessor()
+	err := processor.HandleStepResponse(ctx, state, "pvp_classes", i)
+	if err != nil {
+		log.Printf("Error handling PVP classes step: %v", err)
+	}
 }
 
 func askForTimes(ctx *common.ModuleContext, channelID, userID string) {
@@ -345,20 +334,20 @@ func askForTimes(ctx *common.ModuleContext, channelID, userID string) {
 
 func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.Step != STEP_TIMES {
+	if !exists || (state.Step != STEP_TIMES && state.CurrentStepID != "times") {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
 
-	// Store selected times
-	state.Times = i.MessageComponentData().Values
-	state.Step = STEP_WEEKDAYS
-
 	// Reply to interaction first
 	go discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Horários selecionados com sucesso!", 1*time.Second)
 
-	// Then ask for weekdays
-	askForWeekdays(ctx, state.TopicID, i.Member.User.ID)
+	// Handle using the new step system
+	processor := GetStepProcessor()
+	err := processor.HandleStepResponse(ctx, state, "times", i)
+	if err != nil {
+		log.Printf("Error handling times step: %v", err)
+	}
 }
 
 func askForWeekdays(ctx *common.ModuleContext, channelID, userID string) {
@@ -406,17 +395,20 @@ func askForWeekdays(ctx *common.ModuleContext, channelID, userID string) {
 
 func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.Step != STEP_WEEKDAYS {
+	if !exists || (state.Step != STEP_WEEKDAYS && state.CurrentStepID != "weekdays") {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
 
-	// Store selected weekdays
-	state.Weekdays = i.MessageComponentData().Values
-	state.Step = STEP_COMPLETE
+	// Reply to interaction first
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Dias selecionados com sucesso!", 1*time.Second)
 
-	// Complete registration
-	completeRegistration(ctx, state, i)
+	// Handle using the new step system
+	processor := GetStepProcessor()
+	err := processor.HandleStepResponse(ctx, state, "weekdays", i)
+	if err != nil {
+		log.Printf("Error handling weekdays step: %v", err)
+	}
 }
 
 func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i *discordgo.InteractionCreate) {

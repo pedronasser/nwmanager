@@ -35,6 +35,18 @@ func HandleRegistrationMessage(ctx *common.ModuleContext) func(s *discordgo.Sess
 				log.Printf("Error handling IGN input: %v", err)
 			}
 		}
+
+		// Also handle using new step system if CurrentStepID is set
+		if state.CurrentStepID != "" {
+			processor := GetStepProcessor()
+			step := processor.GetStepByID(state.CurrentStepID)
+			if step != nil && step.Type == StepTypeTextInput {
+				err := processor.HandleStepResponse(ctx, state, state.CurrentStepID, m)
+				if err != nil {
+					log.Printf("Error handling step %s: %v", state.CurrentStepID, err)
+				}
+			}
+		}
 	}
 }
 
@@ -51,53 +63,9 @@ func handleIGNInput(ctx *common.ModuleContext, state *RegistrationState, m *disc
 	// Store IGN and move to next step
 	state.IGN = ign
 	state.Step = STEP_CLASSES
+	state.CurrentStepID = "pvp_classes"
 
-	// Ask for PVP classes
-	return askForClasses(ctx, state.TopicID, state.DiscordID)
-}
-
-func askForClasses(ctx *common.ModuleContext, channelID, userID string) error {
-	dg := ctx.Session()
-
-	// Create class options from constants using ordered array
-	var classOptions []discordgo.SelectMenuOption
-	for _, classKey := range PVP_CLASS_OPTIONS {
-		className := PVP_CLASSES[classKey]
-		classEmoji := PVP_CLASSES_EMOJI[classKey]
-		classOptions = append(classOptions, discordgo.SelectMenuOption{
-			Label: className,
-			Value: classKey,
-			Emoji: &discordgo.ComponentEmoji{
-				Name: classEmoji,
-			},
-		})
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:       "⚔️ Registro - Passo 2/4",
-		Description: "**Quais das seguintes classes PVP você joga?**\n\nVocê pode selecionar várias opções.",
-		Color:       0x0099ff,
-	}
-
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.SelectMenu{
-					CustomID:    "select:pvp_classes",
-					MenuType:    discordgo.StringSelectMenu,
-					Placeholder: "Selecione suas classes de PvP",
-					MinValues:   &[]int{1}[0],
-					MaxValues:   len(classOptions),
-					Options:     classOptions,
-				},
-			},
-		},
-	}
-
-	_, err := dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{embed},
-		Components: components,
-	})
-
-	return err
+	// Use the new step system to process the next step
+	processor := GetStepProcessor()
+	return processor.ProcessStep(ctx, state, "pvp_classes")
 }

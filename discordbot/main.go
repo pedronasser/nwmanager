@@ -26,7 +26,7 @@ var (
 
 func init() {
 	// .env
-	_ = godotenv.Load("clave.env")
+	_ = godotenv.Load()
 }
 
 func main() {
