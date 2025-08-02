@@ -150,6 +150,27 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 		log.Printf("Error updating nickname: %v", err)
 	}
 
+	// Add PVP class role if it exists in the configuration
+	if classRoleID, exists := globalConfig.ClassRoleIDs[selectedClass]; exists {
+		// Remove old class roles first (if player had a different class before)
+		if player.WarClass != "" && player.WarClass != selectedClass {
+			if oldRoleID, oldExists := globalConfig.ClassRoleIDs[player.WarClass]; oldExists {
+				err = ctx.Session().GuildMemberRoleRemove(globalConfig.GuildID, player.DiscordID, oldRoleID)
+				if err != nil {
+					log.Printf("Error removing old class role %s: %v", oldRoleID, err)
+				}
+			}
+		}
+
+		// Add new class role
+		err = ctx.Session().GuildMemberRoleAdd(globalConfig.GuildID, player.DiscordID, classRoleID)
+		if err != nil {
+			log.Printf("Error adding class role %s: %v", classRoleID, err)
+		} else {
+			log.Printf("Successfully added class role %s to player %s", classRoleID, player.IGN)
+		}
+	}
+
 	// Move ticket to class-specific category and update name in a single edit
 	channelEdit := &discordgo.ChannelEdit{
 		Name: player.IGN,
