@@ -47,7 +47,7 @@ var (
 		globals.PVP_CLASS_DISRUPTOR,
 		globals.PVP_CLASS_HEALER,
 		globals.PVP_CLASS_TANK,
-		globals.PVP_CLASS_FIRE,
+		globals.PVP_CLASS_FIRE_ICE,
 		globals.PVP_CLASS_VOID_ICE,
 		globals.PVP_CLASS_ICE_FLAIL,
 		globals.PVP_CLASS_BRUISER,

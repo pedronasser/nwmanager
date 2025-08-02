@@ -185,10 +185,10 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Check if user already has the member role (is already fully registered)
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
-	if globalCfg.MemberRoleID != "" && discordutils.HasRole(i.Member, globalCfg.MemberRoleID) {
-		discordutils.ReplyEphemeralMessage(dg, i, "✅ Você já está registrado na guild!", 5*time.Second)
-		return
-	}
+	// if globalCfg.MemberRoleID != "" && discordutils.HasRole(i.Member, globalCfg.MemberRoleID) {
+	// 	discordutils.ReplyEphemeralMessage(dg, i, "✅ Você já está registrado na guild!", 5*time.Second)
+	// 	return
+	// }
 
 	// Create private text channel for registration
 	channelName := fmt.Sprintf("registro-%s", strings.ToLower(i.Member.User.Username))

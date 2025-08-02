@@ -64,13 +64,17 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 	for _, classKey := range PVP_CLASS_OPTIONS {
 		className := globals.PVP_CLASS_NAMES[classKey]
 		classEmoji := globalCfg.ClassEmojiIDs[string(classKey)]
-		classOptions = append(classOptions, discordgo.SelectMenuOption{
+		option := discordgo.SelectMenuOption{
 			Label: className,
 			Value: string(classKey),
-			Emoji: &discordgo.ComponentEmoji{
+		}
+
+		if classEmoji != "" {
+			option.Emoji = &discordgo.ComponentEmoji{
 				Name: classEmoji,
-			},
-		})
+			}
+		}
+		classOptions = append(classOptions, option)
 	}
 
 	embed := &discordgo.MessageEmbed{

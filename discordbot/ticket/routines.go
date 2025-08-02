@@ -94,8 +94,7 @@ func createTicketForMember(ctx *common.ModuleContext, member *discordgo.Member) 
 		return fmt.Errorf("failed to get player data: %w", err)
 	}
 	if player == nil {
-		log.Printf("No player data found for member %s, skipping ticket creation", member.User.ID)
-		return nil
+		return fmt.Errorf("no player data found for member %s", member.User.ID)
 	}
 
 	// Create ticket channel

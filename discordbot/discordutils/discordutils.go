@@ -236,10 +236,5 @@ func HasRole(member *discordgo.Member, roleID string) bool {
 		return false
 	}
 
-	for _, memberRoleID := range member.Roles {
-		if memberRoleID == roleID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(member.Roles, roleID)
 }
