@@ -3,6 +3,7 @@ package register
 import (
 	"fmt"
 	"nwmanager/discordbot/common"
+	"nwmanager/discordbot/globals"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -58,13 +59,14 @@ func validateIGN(input interface{}) error {
 
 // PVP Classes Step - Select Menu
 func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 	var classOptions []discordgo.SelectMenuOption
 	for _, classKey := range PVP_CLASS_OPTIONS {
-		className := PVP_CLASSES[classKey]
-		classEmoji := PVP_CLASSES_EMOJI[classKey]
+		className := globals.PVP_CLASS_NAMES[classKey]
+		classEmoji := globalCfg.ClassEmojiIDs[string(classKey)]
 		classOptions = append(classOptions, discordgo.SelectMenuOption{
 			Label: className,
-			Value: classKey,
+			Value: string(classKey),
 			Emoji: &discordgo.ComponentEmoji{
 				Name: classEmoji,
 			},
@@ -101,7 +103,12 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 func handlePVPClassesStep(ctx *common.ModuleContext, state *RegistrationState, interaction interface{}) error {
 	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
 		// Store selected classes
-		state.PVPClasses = i.MessageComponentData().Values
+		values := i.MessageComponentData().Values
+		pvpClasses := make([]globals.PVPClassType, len(values))
+		for idx, value := range values {
+			pvpClasses[idx] = globals.PVPClassType(value)
+		}
+		state.PVPClasses = pvpClasses
 		state.Step = STEP_TIMES
 
 		// Move to next step

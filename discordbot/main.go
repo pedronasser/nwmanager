@@ -9,6 +9,7 @@ import (
 	"nwmanager/discordbot/events"
 	"nwmanager/discordbot/globals"
 	"nwmanager/discordbot/register"
+	"nwmanager/discordbot/ticket"
 	"nwmanager/discordbot/voice_channel"
 	"os"
 	"os/signal"
@@ -56,6 +57,7 @@ func main() {
 	ml.RegisterModule(events.ModuleName, &events.EventsModule{})
 	ml.RegisterModule(voice_channel.ModuleName, &voice_channel.VoiceChannelModule{})
 	ml.RegisterModule(admin_commands.ModuleName, &admin_commands.AdminCommandsModule{})
+	ml.RegisterModule(ticket.ModuleName, &ticket.TicketModule{})
 
 	ml.Run(ctx)
 

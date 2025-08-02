@@ -185,7 +185,7 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Check if user already has the member role (is already fully registered)
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
-	if globalCfg.MemberRoleID != "" && hasRole(i.Member, globalCfg.MemberRoleID) {
+	if globalCfg.MemberRoleID != "" && discordutils.HasRole(i.Member, globalCfg.MemberRoleID) {
 		discordutils.ReplyEphemeralMessage(dg, i, "✅ Você já está registrado na guild!", 5*time.Second)
 		return
 	}
@@ -421,7 +421,7 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 		InGameName: state.IGN,
 		WeekDays:   state.Weekdays,
 		Hours:      state.Times,
-		Weapons:    state.PVPClasses, // Using weapons field for PVP classes
+		PVPClasses: state.PVPClasses, // Using weapons field for PVP classes
 		CreatedAt:  time.Now(),
 	}
 
@@ -445,12 +445,13 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 
 func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, registration *types.Register) {
 	dg := ctx.Session()
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 
 	// Create readable lists for the summary
 	var classNames []string
 	for _, class := range state.PVPClasses {
-		if name, exists := PVP_CLASSES[class]; exists {
-			if emoji, emojiExists := PVP_CLASSES_EMOJI[class]; emojiExists {
+		if name, exists := globals.PVP_CLASS_NAMES[class]; exists {
+			if emoji, emojiExists := globalCfg.ClassEmojiIDs[string(class)]; emojiExists {
 				classNames = append(classNames, fmt.Sprintf("%s %s", emoji, name))
 			} else {
 				classNames = append(classNames, name)
@@ -688,30 +689,10 @@ func GetModuleConfig(ctx *common.ModuleContext) *RegisterConfig {
 }
 
 func hasAdminPermission(member *discordgo.Member, adminRoleID string) bool {
-	if adminRoleID == "" {
-		return false
-	}
-
-	for _, roleID := range member.Roles {
-		if roleID == adminRoleID {
-			return true
-		}
-	}
-	return false
+	return discordutils.HasRole(member, adminRoleID)
 }
 
-func hasRole(member *discordgo.Member, roleID string) bool {
-	if roleID == "" {
-		return false
-	}
-
-	for _, memberRoleID := range member.Roles {
-		if memberRoleID == roleID {
-			return true
-		}
-	}
-	return false
-}
+// Remove the duplicate hasRole function since we're now using discordutils.HasRole
 
 // These functions would need to be implemented based on your database layer
 func insertRegistration(ctx *common.ModuleContext, registration *types.Register) error {
@@ -741,8 +722,7 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		ID:                primitive.NewObjectID(),
 		DiscordID:         registration.DiscordID,
 		IGN:               registration.InGameName,
-		WarClass:          registration.Weapons, // Keep existing field for compatibility
-		PVPClasses:        registration.Weapons,
+		PVPClasses:        registration.PVPClasses,
 		AvailableTimes:    registration.Hours,
 		AvailableWeekdays: registration.WeekDays,
 		RegisteredAt:      &now,

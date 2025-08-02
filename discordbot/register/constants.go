@@ -1,26 +1,8 @@
 package register
 
+import "nwmanager/discordbot/globals"
+
 const (
-	// User can select multiple classes
-	PVP_CLASS_DISRUPTOR = "disruptor"
-	PVP_CLASS_HEALER    = "healer"
-	PVP_CLASS_TANK      = "tank"
-	PVP_CLASS_FIRE      = "fire"
-	PVP_CLASS_ICE_FLAIL = "ice_flail"
-	PVP_CLASS_BRUISER   = "bruiser"
-	PVP_CLASS_BOW       = "bow"
-	PVP_CLASS_ASSASSIN  = "assassin"
-
-	// CLASS EMOJI
-	PVP_CLASS_DISRUPTOR_EMOJI = "🌀"
-	PVP_CLASS_HEALER_EMOJI    = "🍃"
-	PVP_CLASS_TANK_EMOJI      = "🛡️"
-	PVP_CLASS_FIRE_EMOJI      = "🔥"
-	PVP_CLASS_ICE_FLAIL_EMOJI = "❄️"
-	PVP_CLASS_BRUISER_EMOJI   = "🪓"
-	PVP_CLASS_BOW_EMOJI       = "🏹"
-	PVP_CLASS_ASSASSIN_EMOJI  = "🗡️"
-
 	// User can select multiple times
 	TIME_MORNING   = "morning"
 	TIME_AFTERNOON = "afternoon"
@@ -61,37 +43,15 @@ const (
 )
 
 var (
-	PVP_CLASSES = map[string]string{
-		PVP_CLASS_DISRUPTOR: "Disruptor",
-		PVP_CLASS_HEALER:    "Healer",
-		PVP_CLASS_TANK:      "Tank",
-		PVP_CLASS_FIRE:      "Fire",
-		PVP_CLASS_ICE_FLAIL: "Ice Flail",
-		PVP_CLASS_BRUISER:   "Bruiser",
-		PVP_CLASS_BOW:       "Bow",
-		PVP_CLASS_ASSASSIN:  "Assassin",
-	}
-
-	PVP_CLASS_OPTIONS = []string{
-		PVP_CLASS_DISRUPTOR,
-		PVP_CLASS_HEALER,
-		PVP_CLASS_TANK,
-		PVP_CLASS_FIRE,
-		PVP_CLASS_ICE_FLAIL,
-		PVP_CLASS_BRUISER,
-		PVP_CLASS_BOW,
-		PVP_CLASS_ASSASSIN,
-	}
-
-	PVP_CLASSES_EMOJI = map[string]string{
-		PVP_CLASS_DISRUPTOR: PVP_CLASS_DISRUPTOR_EMOJI,
-		PVP_CLASS_HEALER:    PVP_CLASS_HEALER_EMOJI,
-		PVP_CLASS_TANK:      PVP_CLASS_TANK_EMOJI,
-		PVP_CLASS_FIRE:      PVP_CLASS_FIRE_EMOJI,
-		PVP_CLASS_ICE_FLAIL: PVP_CLASS_ICE_FLAIL_EMOJI,
-		PVP_CLASS_BRUISER:   PVP_CLASS_BRUISER_EMOJI,
-		PVP_CLASS_BOW:       PVP_CLASS_BOW_EMOJI,
-		PVP_CLASS_ASSASSIN:  PVP_CLASS_ASSASSIN_EMOJI,
+	PVP_CLASS_OPTIONS = []globals.PVPClassType{
+		globals.PVP_CLASS_DISRUPTOR,
+		globals.PVP_CLASS_HEALER,
+		globals.PVP_CLASS_TANK,
+		globals.PVP_CLASS_FIRE,
+		globals.PVP_CLASS_ICE_FLAIL,
+		globals.PVP_CLASS_BRUISER,
+		globals.PVP_CLASS_BOW,
+		globals.PVP_CLASS_ASSASSIN,
 	}
 
 	TIMES = map[string]string{

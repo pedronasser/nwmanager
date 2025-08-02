@@ -229,3 +229,17 @@ func CreateSelectMenus(options ...common.EventSelectorOption) []discordgo.Select
 	}
 	return selectMenus
 }
+
+// HasRole checks if a Discord member has a specific role
+func HasRole(member *discordgo.Member, roleID string) bool {
+	if roleID == "" {
+		return false
+	}
+
+	for _, memberRoleID := range member.Roles {
+		if memberRoleID == roleID {
+			return true
+		}
+	}
+	return false
+}

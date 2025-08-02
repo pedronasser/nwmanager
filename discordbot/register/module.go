@@ -34,7 +34,7 @@ type RegistrationState struct {
 	Step          int    // Keep for backward compatibility
 	CurrentStepID string // New step ID for dynamic system
 	IGN           string
-	PVPClasses    []string
+	PVPClasses    []globals.PVPClassType
 	Times         []string
 	Weekdays      []string
 	MessageID     string

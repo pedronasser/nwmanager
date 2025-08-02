@@ -18,16 +18,48 @@ The `ticket` module is a Discord bot component designed to automatically create 
 - Creates ticket channels automatically when members receive the role
 - Uses format: `${playerClassEmoji} ${playerIGN}` for channel naming
 - Integrates with existing player data from the register module
+- Initially creates tickets in the main ticket category, then moves to class-specific categories
 
 ### 2. Ticket Management Interface
 - Single embedded message per ticket with interactive buttons
 - Persistent UI that handles all ticket-related operations
 - Admin and player-specific command access control
+- Class-based ticket organization using category movement
 
 ### 3. Member Role Monitoring
 - Background routine to check member role status
 - Automatic ticket deletion when `MEMBER_ROLE_ID` is removed
 - Automatic ticket recreation when role is re-assigned
+
+### 4. Class-based Organization
+- Tickets start in main ticket category (`TicketCategoryID`)
+- When player selects/changes class, ticket moves to class-specific category
+- Uses `ClassCategoryIDs` from globals config for class organization
+- Automatic channel renaming with class emojis from globals config
+
+## Ticket Lifecycle Workflow
+
+### Initial Ticket Creation
+1. **Member receives `MEMBER_ROLE_ID`** → Background routine detects role assignment
+2. **Ticket channel created** in main ticket category (`TicketCategoryID`)
+3. **Channel named** with format: `${playerClassEmoji} ${playerIGN}`
+4. **Embedded message** with command buttons is posted
+5. **Permissions set** for player and admins only
+
+### Class Selection Process
+1. **Player clicks "Trocar Classe Guerra"** button
+2. **Class selection dropdown** appears using `globalConfig.ClassEmojiIDs`
+3. **Player selects class** → Multiple updates occur:
+   - **Player class updated** in database
+   - **Discord nickname updated** to `${classEmoji} ${playerIGN}`
+   - **Ticket channel moved** to class-specific category from `globalConfig.ClassCategoryIDs`
+   - **Channel name updated** with new class emoji
+4. **Ticket now organized** by class in appropriate category
+
+### Ticket Removal
+1. **Member loses `MEMBER_ROLE_ID`** → Background routine detects role removal
+2. **Ticket channel deleted** automatically
+3. **Database records cleaned up**
 
 ## Technical Implementation Plan
 
@@ -65,22 +97,17 @@ type Ticket struct {
 ### Module Configuration
 ```go
 type TicketConfig struct {
-    Enabled             bool   `json:"enabled"`
-    TicketCategoryID    string `json:"ticket_category_id"`
-    CheckInterval       int    `json:"check_interval_seconds"`
-    
-    // Class emoji mappings
-    ClassEmojis         map[string]string `json:"class_emojis"`
-    
-    // Thread settings
-    BuildThreadTimeout  int    `json:"build_thread_timeout_hours"`
-    QuestionThreadTimeout int  `json:"question_thread_timeout_hours"`
+    Enabled          bool   `json:"enabled"`
+    TicketCategoryID string `json:"ticket_category_id"`
+    CheckInterval    int    `json:"check_interval_seconds"`
 }
 
-// Note: MemberRoleID and AdminRoleID are accessed from globals config:
+// Note: The following are accessed from globals config:
 // globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 // memberRoleID := globalCfg.MemberRoleID
 // adminRoleID := globalCfg.AdminRoleID
+// classEmojis := globalCfg.ClassEmojiIDs
+// classCategoryIDs := globalCfg.ClassCategoryIDs
 ```
 
 ### Core Handlers Implementation
@@ -103,6 +130,31 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 ### Command Button Implementations
 
 #### 1. Enviar Build Button
+- Creates a thread named `build-${playerIGN}` for build image uploads
+- **No automatic timeout** - thread remains open until manually closed
+- Includes submit button for build confirmation
+- Both player and admins can close the thread manually
+
+#### 2. Enviar Dúvida Button  
+- Creates a thread named `duvida-${playerIGN}` for questions
+- **No automatic timeout** - thread remains open until manually closed
+- Includes close button for when question is resolved
+- Both player and admins can close the thread manually
+
+#### 3. Trocar Classe Guerra Button
+- Shows class selection dropdown using emojis from globals config
+- Updates player class in database and Discord nickname
+- **IMPORTANT: Moves ticket from main category to class-specific category**
+- **Uses `globalConfig.ClassCategoryIDs[selectedClass]` for category placement**
+- Updates channel name with new class emoji
+- Available to both player (ticket owner) and admins
+
+#### 4. Ver Build Atual Button
+- Displays current player build information
+- **Ephemeral response** - only visible to the user who clicked
+- Retrieves latest build data from database or build threads
+
+#### 1. Enviar Build Button
 ```go
 func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
     // Get player data from database
@@ -114,7 +166,7 @@ func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) 
     
     // Create thread for build submission
     threadName := fmt.Sprintf("build-%s", player.IGN)
-    thread, err := ctx.Session().MessageThreadStart(i.ChannelID, i.Message.ID, threadName, 1440) // 24 hours
+    thread, err := ctx.Session().MessageThreadStart(i.ChannelID, i.Message.ID, threadName, 0) // No timeout - manual close only
     if err != nil {
         discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao criar thread para build.", 5*time.Second)
         return
@@ -136,7 +188,7 @@ func handleSendQuestion(ctx *common.ModuleContext, i *discordgo.InteractionCreat
     }
     
     threadName := fmt.Sprintf("duvida-%s", player.IGN)
-    thread, err := ctx.Session().MessageThreadStart(i.ChannelID, i.Message.ID, threadName, 1440)
+    thread, err := ctx.Session().MessageThreadStart(i.ChannelID, i.Message.ID, threadName, 0) // No timeout - manual close only
     if err != nil {
         discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao criar thread para dúvida.", 5*time.Second)
         return
@@ -150,7 +202,6 @@ func handleSendQuestion(ctx *common.ModuleContext, i *discordgo.InteractionCreat
 #### 3. Trocar Classe Guerra Button
 ```go
 func handleChangeClass(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
-    config := GetModuleConfig(ctx)
     globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
     
     // Check if user is admin or the ticket owner
@@ -162,8 +213,8 @@ func handleChangeClass(ctx *common.ModuleContext, i *discordgo.InteractionCreate
         return
     }
     
-    // Create class selection dropdown
-    classOptions := createClassSelectOptions(config.ClassEmojis)
+    // Create class selection dropdown using global class emojis
+    classOptions := createClassSelectOptions(globalConfig.ClassEmojiIDs)
     
     discordutils.SendInteractiveMessage(ctx.Session(), i, "select:class_selection", "Selecione a nova classe:",
         discordgo.ActionsRow{
@@ -179,6 +230,57 @@ func handleChangeClass(ctx *common.ModuleContext, i *discordgo.InteractionCreate
             },
         },
     )
+}
+
+func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+    globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+    
+    selectedClass := i.MessageComponentData().Values[0]
+    
+    // Get player and update their class
+    player, err := getPlayerByTicketChannel(ctx, i.ChannelID)
+    if err != nil {
+        discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao encontrar dados do jogador.", 5*time.Second)
+        return
+    }
+    
+    // Update player class in database
+    err = updatePlayerClass(ctx, player, selectedClass)
+    if err != nil {
+        discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao atualizar classe do jogador.", 5*time.Second)
+        return
+    }
+    
+    // Get class emoji and update nickname
+    classEmoji := globalConfig.ClassEmojiIDs[selectedClass]
+    newNickname := fmt.Sprintf("%s %s", classEmoji, player.IGN)
+    
+    // Update Discord nickname
+    err = ctx.Session().GuildMemberNickname(globalConfig.GuildID, player.DiscordID, newNickname)
+    if err != nil {
+        log.Printf("Error updating nickname: %v", err)
+    }
+    
+    // Move ticket to class-specific category
+    if categoryID, exists := globalConfig.ClassCategoryIDs[selectedClass]; exists {
+        _, err = ctx.Session().ChannelEdit(i.ChannelID, &discordgo.ChannelEdit{
+            ParentID: &categoryID,
+        })
+        if err != nil {
+            log.Printf("Error moving ticket to class category: %v", err)
+        }
+    }
+    
+    // Update ticket channel name
+    newChannelName := fmt.Sprintf("%s %s", classEmoji, player.IGN)
+    _, err = ctx.Session().ChannelEdit(i.ChannelID, &discordgo.ChannelEdit{
+        Name: newChannelName,
+    })
+    if err != nil {
+        log.Printf("Error updating channel name: %v", err)
+    }
+    
+    discordutils.ReplyEphemeralMessage(ctx.Session(), i, fmt.Sprintf("Classe alterada para %s %s com sucesso!", classEmoji, selectedClass), 5*time.Second)
 }
 ```
 
@@ -284,13 +386,15 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
     config := GetModuleConfig(ctx)
     globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
     
-    classEmoji := getClassEmoji(player.WarClass[0]) // Assuming primary class
+    classEmoji := getClassEmoji(globalConfig.ClassEmojiIDs, player.WarClass[0]) // Get emoji from globals
     channelName := fmt.Sprintf("%s %s", classEmoji, player.IGN)
     
+    // Initially create in the main ticket category
+    // Will be moved to class-specific category when player selects/changes class
     channel, err := ctx.Session().GuildChannelCreateComplex(globalConfig.GuildID, discordgo.GuildChannelCreateData{
         Name:     channelName,
         Type:     discordgo.ChannelTypeGuildText,
-        ParentID: config.TicketCategoryID,
+        ParentID: config.TicketCategoryID, // Main ticket category
         PermissionOverwrites: []*discordgo.PermissionOverwrite{
             {
                 ID:   globalConfig.EveryoneRoleID,
@@ -323,6 +427,24 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
     }
     
     return channel, nil
+}
+
+// moveTicketToClassCategory moves a ticket to the appropriate class category
+func moveTicketToClassCategory(ctx *common.ModuleContext, channelID, playerClass string) error {
+    globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+    
+    // Check if class has a specific category
+    if categoryID, exists := globalConfig.ClassCategoryIDs[playerClass]; exists {
+        _, err := ctx.Session().ChannelEdit(channelID, &discordgo.ChannelEdit{
+            ParentID: &categoryID,
+        })
+        if err != nil {
+            return fmt.Errorf("failed to move ticket to class category: %w", err)
+        }
+        log.Printf("Moved ticket %s to class category %s", channelID, categoryID)
+    }
+    
+    return nil
 }
 ```
 
@@ -368,11 +490,9 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
 ```bash
 TICKET_CATEGORY_ID="123456789"
 TICKET_CHECK_INTERVAL=300
-BUILD_THREAD_TIMEOUT=24
-QUESTION_THREAD_TIMEOUT=12
 ```
 
-Note: `MEMBER_ROLE_ID` and `ADMIN_ROLE_ID` are already configured in the globals module.
+Note: `MEMBER_ROLE_ID`, `ADMIN_ROLE_ID`, class emojis, and class category IDs are already configured in the globals module.
 
 #### Default Configuration
 ```go
@@ -380,24 +500,18 @@ func (s *TicketModule) DefaultConfig() *TicketConfig {
     var IsModuleEnabledFromEnv = slices.Contains(strings.Split(os.Getenv("MODULES"), ","), ModuleName)
     
     return &TicketConfig{
-        Enabled:               IsModuleEnabledFromEnv,
-        TicketCategoryID:      os.Getenv("TICKET_CATEGORY_ID"),
-        CheckInterval:         300, // 5 minutes default
-        BuildThreadTimeout:    24,  // 24 hours
-        QuestionThreadTimeout: 12,  // 12 hours
-        ClassEmojis: map[string]string{
-            "tank":     "🛡️",
-            "dps":      "⚔️",
-            "heal":     "💚",
-            "support":  "🔧",
-        },
+        Enabled:          IsModuleEnabledFromEnv,
+        TicketCategoryID: os.Getenv("TICKET_CATEGORY_ID"),
+        CheckInterval:    300, // 5 minutes default
     }
 }
 
-// Note: MemberRoleID and AdminRoleID are accessed from globals:
+// Note: The following are accessed from globals config:
 // globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 // memberRoleID := globalCfg.MemberRoleID
 // adminRoleID := globalCfg.AdminRoleID
+// classEmojis := globalCfg.ClassEmojiIDs
+// classCategoryIDs := globalCfg.ClassCategoryIDs
 ```
 
 ## Migration and Rollout Plan
@@ -416,22 +530,3 @@ func (s *TicketModule) DefaultConfig() *TicketConfig {
 1. Integrate with register module workflow
 2. Implement member role monitoring routine
 3. Add comprehensive error handling and logging
-
-### Phase 4: Testing and Optimization
-1. Comprehensive testing of all features
-2. Performance optimization and scalability improvements
-3. Documentation and deployment procedures
-
-## Future Enhancements
-
-### Advanced Features
-- Build comparison and history tracking
-- Automated build validation against game meta
-- Integration with external build planning tools
-- Advanced analytics and reporting for guild management
-
-### User Experience Improvements
-- Rich embed formatting for build displays
-- Image optimization and storage for build screenshots
-- Automated reminders for incomplete registrations
-- Advanced search and filtering for ticket management
