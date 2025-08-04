@@ -128,12 +128,25 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
 	config := GetModuleConfig(ctx)
 	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
 
-	// Initially create in the main ticket category
-	// Will be moved to class-specific category when player selects/changes class
+	// Determine which category to create the ticket in
+	var categoryID string
+	if player.WarClass != "" {
+		// Player has a class defined, create in class-specific category
+		if classCategory, exists := globalConfig.ClassCategoryIDs[player.WarClass]; exists {
+			categoryID = classCategory
+		} else {
+			// Fallback to main category if class category doesn't exist
+			categoryID = config.TicketCategoryID
+		}
+	} else {
+		// No class defined, create in main ticket category
+		categoryID = config.TicketCategoryID
+	}
+
 	channel, err := ctx.Session().GuildChannelCreateComplex(globalConfig.GuildID, discordgo.GuildChannelCreateData{
 		Name:     player.IGN,
 		Type:     discordgo.ChannelTypeGuildText,
-		ParentID: config.TicketCategoryID, // Main ticket category
+		ParentID: categoryID,
 		PermissionOverwrites: []*discordgo.PermissionOverwrite{
 			{
 				ID:   globalConfig.GuildID, // @everyone role (guild ID)
@@ -155,6 +168,30 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ticket channel: %w", err)
+	}
+
+	// If player has a war class defined, add class role and update nickname
+	if player.WarClass != "" {
+		// Add PVP class role if it exists in the configuration
+		if classRoleID, exists := globalConfig.ClassRoleIDs[player.WarClass]; exists {
+			err = ctx.Session().GuildMemberRoleAdd(globalConfig.GuildID, player.DiscordID, classRoleID)
+			if err != nil {
+				log.Printf("Error adding class role %s to player %s: %v", classRoleID, player.IGN, err)
+			} else {
+				log.Printf("Successfully added class role %s to player %s", classRoleID, player.IGN)
+			}
+		}
+
+		// Update Discord nickname with class emoji
+		if classEmoji, exists := globalConfig.ClassEmojiIDs[player.WarClass]; exists {
+			newNickname := fmt.Sprintf("%s %s", classEmoji, player.IGN)
+			err = ctx.Session().GuildMemberNickname(globalConfig.GuildID, player.DiscordID, newNickname)
+			if err != nil {
+				log.Printf("Error updating nickname for player %s: %v", player.IGN, err)
+			} else {
+				log.Printf("Successfully updated nickname for player %s to %s", player.IGN, newNickname)
+			}
+		}
 	}
 
 	// Create and send the main ticket message
