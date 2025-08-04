@@ -183,7 +183,7 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 
 	if categoryID, exists := globalConfig.ClassCategoryIDs[selectedClass]; exists {
 		channelEdit.ParentID = categoryID
-		
+
 		// Get category permissions to sync them in the same edit
 		category, err := ctx.Session().Channel(categoryID)
 		if err != nil {
@@ -192,6 +192,11 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 			// Include category permissions in the same edit
 			channelEdit.PermissionOverwrites = category.PermissionOverwrites
 		}
+		channelEdit.PermissionOverwrites = append(channelEdit.PermissionOverwrites, &discordgo.PermissionOverwrite{
+			ID:    player.DiscordID,
+			Type:  discordgo.PermissionOverwriteTypeMember,
+			Allow: discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionReadMessageHistory,
+		})
 	}
 
 	_, err = ctx.Session().ChannelEdit(i.ChannelID, channelEdit)
