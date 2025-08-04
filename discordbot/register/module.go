@@ -29,15 +29,14 @@ var RegisterData = make(map[string]*RegistrationState)
 var stepProcessor *StepProcessor
 
 type RegistrationState struct {
-	DiscordID     string
-	TopicID       string // Registration channel ID
-	Step          int    // Keep for backward compatibility
-	CurrentStepID string // New step ID for dynamic system
-	IGN           string
-	PVPClasses    []globals.PVPClassType
-	Times         []string
-	Weekdays      []string
-	MessageID     string
+	DiscordID   string
+	TopicID     string // Registration channel ID
+	StepIndex   int    // Current step index (0-based)
+	IGN         string
+	PVPClasses  []globals.PVPClassType
+	Times       []string
+	Weekdays    []string
+	MessageID   string
 }
 
 // GetStepProcessor returns the global step processor instance

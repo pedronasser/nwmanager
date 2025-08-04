@@ -11,8 +11,9 @@ import (
 
 // IGN Step - Text Input
 func createIGNStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
 	embed := &discordgo.MessageEmbed{
-		Title:       "📝 Registro - Passo 1/4",
+		Title:       processor.GetStepTitle(state.StepIndex),
 		Description: "**Qual é o seu nome no jogo (IGN)?**\n\nPor favor, digite seu nome exatamente como aparece no New World.",
 		Color:       0x0099ff,
 		Footer: &discordgo.MessageEmbedFooter{
@@ -37,12 +38,11 @@ func handleIGNStep(ctx *common.ModuleContext, state *RegistrationState, interact
 
 		// Store IGN and move to next step
 		state.IGN = ign
-		state.Step = STEP_CLASSES
-		state.CurrentStepID = "pvp_classes"
+		state.StepIndex++
 
 		// Process next step
 		processor := GetStepProcessor()
-		return processor.ProcessStep(ctx, state, "pvp_classes")
+		return processor.ProcessStep(ctx, state, state.StepIndex)
 	}
 	return nil
 }
@@ -59,6 +59,7 @@ func validateIGN(input interface{}) error {
 
 // PVP Classes Step - Select Menu
 func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 	var classOptions []discordgo.SelectMenuOption
 	for _, classKey := range PVP_CLASS_OPTIONS {
@@ -78,7 +79,7 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "⚔️ Registro - Passo 2/4",
+		Title:       processor.GetStepTitle(state.StepIndex),
 		Description: "**Quais das seguintes classes PVP você joga?**\n\nVocê pode selecionar várias opções.",
 		Color:       0x0099ff,
 	}
@@ -113,21 +114,18 @@ func handlePVPClassesStep(ctx *common.ModuleContext, state *RegistrationState, i
 			pvpClasses[idx] = globals.PVPClassType(value)
 		}
 		state.PVPClasses = pvpClasses
-		state.Step = STEP_TIMES
+		state.StepIndex++
 
 		// Move to next step
 		processor := GetStepProcessor()
-		nextStep := processor.GetNextStep("pvp_classes")
-		if nextStep != nil {
-			state.CurrentStepID = nextStep.ID
-			return processor.ProcessStep(ctx, state, nextStep.ID)
-		}
+		return processor.ProcessStep(ctx, state, state.StepIndex)
 	}
 	return nil
 }
 
 // Times Step - Select Menu
 func createTimesStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
 	var timeOptions []discordgo.SelectMenuOption
 	for _, timeKey := range TIME_OPTIONS {
 		timeName := TIMES[timeKey]
@@ -138,7 +136,7 @@ func createTimesStep(ctx *common.ModuleContext, state *RegistrationState) (*disc
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "⏰ Registro - Passo 3/4",
+		Title:       processor.GetStepTitle(state.StepIndex),
 		Description: "**Quais horários você costuma jogar?**\n\nSelecione todos os horários em que você geralmente está disponível.",
 		Color:       0x0099ff,
 	}
@@ -168,21 +166,18 @@ func handleTimesStep(ctx *common.ModuleContext, state *RegistrationState, intera
 	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
 		// Store selected times
 		state.Times = i.MessageComponentData().Values
-		state.Step = STEP_WEEKDAYS
+		state.StepIndex++
 
 		// Move to next step
 		processor := GetStepProcessor()
-		nextStep := processor.GetNextStep("times")
-		if nextStep != nil {
-			state.CurrentStepID = nextStep.ID
-			return processor.ProcessStep(ctx, state, nextStep.ID)
-		}
+		return processor.ProcessStep(ctx, state, state.StepIndex)
 	}
 	return nil
 }
 
 // Weekdays Step - Select Menu
 func createWeekdaysStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
 	var weekdayOptions []discordgo.SelectMenuOption
 	for _, weekdayKey := range WEEKDAY_OPTIONS {
 		weekdayName := WEEKDAYS[weekdayKey]
@@ -193,7 +188,7 @@ func createWeekdaysStep(ctx *common.ModuleContext, state *RegistrationState) (*d
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "📅 Registro - Passo 4/4",
+		Title:       processor.GetStepTitle(state.StepIndex),
 		Description: "**Quais dias da semana você costuma jogar?**\n\nSelecione todos os dias em que você geralmente joga.",
 		Color:       0x0099ff,
 	}
@@ -223,7 +218,6 @@ func handleWeekdaysStep(ctx *common.ModuleContext, state *RegistrationState, int
 	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
 		// Store selected weekdays
 		state.Weekdays = i.MessageComponentData().Values
-		state.Step = STEP_COMPLETE
 
 		// This is the last step, complete registration
 		completeRegistration(ctx, state, i)

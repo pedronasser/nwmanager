@@ -16,16 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Registration steps
-const (
-	STEP_START    = 0
-	STEP_IGN      = 1
-	STEP_CLASSES  = 2
-	STEP_TIMES    = 3
-	STEP_WEEKDAYS = 4
-	STEP_COMPLETE = 5
-)
-
 var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
 	"btn:start_registration":   startRegistration,
 	"select:pvp_classes":       handleClassSelection,
@@ -252,15 +242,14 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Initialize registration state
 	RegisterData[i.Member.User.ID] = &RegistrationState{
-		DiscordID:     i.Member.User.ID,
-		TopicID:       channel.ID,
-		Step:          STEP_IGN, // Keep for backward compatibility
-		CurrentStepID: "ign",    // New step-based system
+		DiscordID: i.Member.User.ID,
+		TopicID:   channel.ID,
+		StepIndex: 0, // Start with first step (0-based index)
 	}
 
 	// Start the first step using the new step processor
 	processor := GetStepProcessor()
-	err = processor.ProcessStep(ctx, RegisterData[i.Member.User.ID], "ign")
+	err = processor.ProcessStep(ctx, RegisterData[i.Member.User.ID], 0)
 	if err != nil {
 		log.Printf("Error processing first step: %v", err)
 		discordutils.ReplyEphemeralMessage(dg, i, "❌ Erro ao iniciar registro.", 5*time.Second)
@@ -273,7 +262,7 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || (state.Step != STEP_CLASSES && state.CurrentStepID != "pvp_classes") {
+	if !exists || state.StepIndex != 1 { // PVP Classes is step index 1
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
@@ -283,58 +272,15 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 
 	// Handle using the new step system
 	processor := GetStepProcessor()
-	err := processor.HandleStepResponse(ctx, state, "pvp_classes", i)
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling PVP classes step: %v", err)
 	}
 }
 
-func askForTimes(ctx *common.ModuleContext, channelID, userID string) {
-	dg := ctx.Session()
-
-	// Create time options from constants using ordered array
-	var timeOptions []discordgo.SelectMenuOption
-	for _, timeKey := range TIME_OPTIONS {
-		timeName := TIMES[timeKey]
-		timeOptions = append(timeOptions, discordgo.SelectMenuOption{
-			Label: timeName,
-			Value: timeKey,
-		})
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:       "⏰ Registro - Passo 3/4",
-		Description: "**Quais horários você costuma jogar?**\n\nSelecione todos os horários em que você geralmente está disponível.",
-		Color:       0x0099ff,
-	}
-
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.SelectMenu{
-					CustomID:    "select:times",
-					MenuType:    discordgo.StringSelectMenu,
-					Placeholder: "Selecione seus horários disponíveis",
-					MinValues:   &[]int{1}[0],
-					MaxValues:   len(timeOptions),
-					Options:     timeOptions,
-				},
-			},
-		},
-	}
-
-	_, err := dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{embed},
-		Components: components,
-	})
-	if err != nil {
-		log.Printf("Error sending times question: %v", err)
-	}
-}
-
 func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || (state.Step != STEP_TIMES && state.CurrentStepID != "times") {
+	if !exists || state.StepIndex != 2 { // Times is step index 2
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
@@ -344,58 +290,15 @@ func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 
 	// Handle using the new step system
 	processor := GetStepProcessor()
-	err := processor.HandleStepResponse(ctx, state, "times", i)
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling times step: %v", err)
 	}
 }
 
-func askForWeekdays(ctx *common.ModuleContext, channelID, userID string) {
-	dg := ctx.Session()
-
-	// Create weekday options from constants using ordered array
-	var weekdayOptions []discordgo.SelectMenuOption
-	for _, weekdayKey := range WEEKDAY_OPTIONS {
-		weekdayName := WEEKDAYS[weekdayKey]
-		weekdayOptions = append(weekdayOptions, discordgo.SelectMenuOption{
-			Label: weekdayName,
-			Value: weekdayKey,
-		})
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:       "📅 Registro - Passo 4/4",
-		Description: "**Quais dias da semana você costuma jogar?**\n\nSelecione todos os dias em que você geralmente joga.",
-		Color:       0x0099ff,
-	}
-
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.SelectMenu{
-					CustomID:    "select:weekdays",
-					MenuType:    discordgo.StringSelectMenu,
-					Placeholder: "Selecione os dias da semana",
-					MinValues:   &[]int{1}[0],
-					MaxValues:   len(weekdayOptions),
-					Options:     weekdayOptions,
-				},
-			},
-		},
-	}
-
-	_, err := dg.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{embed},
-		Components: components,
-	})
-	if err != nil {
-		log.Printf("Error sending weekdays question: %v", err)
-	}
-}
-
 func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || (state.Step != STEP_WEEKDAYS && state.CurrentStepID != "weekdays") {
+	if !exists || state.StepIndex != 3 { // Weekdays is step index 3
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
 		return
 	}
@@ -405,7 +308,7 @@ func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionC
 
 	// Handle using the new step system
 	processor := GetStepProcessor()
-	err := processor.HandleStepResponse(ctx, state, "weekdays", i)
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling weekdays step: %v", err)
 	}

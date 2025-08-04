@@ -1,6 +1,7 @@
 package register
 
 import (
+	"fmt"
 	"nwmanager/discordbot/common"
 
 	"github.com/bwmarrin/discordgo"
@@ -18,14 +19,11 @@ const (
 
 // StepDefinition defines a registration step
 type StepDefinition struct {
-	ID         string
-	Name       string
-	Type       StepType
-	StepNumber int
-	TotalSteps int
-	Creator    StepCreator
-	Handler    StepHandler
-	Validator  StepValidator
+	Name      string
+	Type      StepType
+	Creator   StepCreator
+	Handler   StepHandler
+	Validator StepValidator
 }
 
 // StepCreator creates the step message/components
@@ -47,74 +45,53 @@ func NewStepProcessor() *StepProcessor {
 	return &StepProcessor{
 		steps: []StepDefinition{
 			{
-				ID:         "ign",
-				Name:       "In-Game Name",
-				Type:       StepTypeTextInput,
-				StepNumber: 1,
-				TotalSteps: 4,
-				Creator:    createIGNStep,
-				Handler:    handleIGNStep,
-				Validator:  validateIGN,
+				Name:      "In-Game Name",
+				Type:      StepTypeTextInput,
+				Creator:   createIGNStep,
+				Handler:   handleIGNStep,
+				Validator: validateIGN,
 			},
 			{
-				ID:         "pvp_classes",
-				Name:       "PVP Classes",
-				Type:       StepTypeSelectMenu,
-				StepNumber: 2,
-				TotalSteps: 4,
-				Creator:    createPVPClassesStep,
-				Handler:    handlePVPClassesStep,
+				Name:    "PVP Classes",
+				Type:    StepTypeSelectMenu,
+				Creator: createPVPClassesStep,
+				Handler: handlePVPClassesStep,
 			},
 			{
-				ID:         "times",
-				Name:       "Available Times",
-				Type:       StepTypeSelectMenu,
-				StepNumber: 3,
-				TotalSteps: 4,
-				Creator:    createTimesStep,
-				Handler:    handleTimesStep,
+				Name:    "Available Times",
+				Type:    StepTypeSelectMenu,
+				Creator: createTimesStep,
+				Handler: handleTimesStep,
 			},
 			{
-				ID:         "weekdays",
-				Name:       "Weekdays",
-				Type:       StepTypeSelectMenu,
-				StepNumber: 4,
-				TotalSteps: 4,
-				Creator:    createWeekdaysStep,
-				Handler:    handleWeekdaysStep,
+				Name:    "Weekdays",
+				Type:    StepTypeSelectMenu,
+				Creator: createWeekdaysStep,
+				Handler: handleWeekdaysStep,
 			},
 		},
 	}
 }
 
-// GetStepByID returns a step by its ID
-func (sp *StepProcessor) GetStepByID(id string) *StepDefinition {
-	for _, step := range sp.steps {
-		if step.ID == id {
-			return &step
-		}
-	}
-	return nil
+// GetTotalSteps returns the total number of steps
+func (sp *StepProcessor) GetTotalSteps() int {
+	return len(sp.steps)
 }
 
-// GetStepByNumber returns a step by its number (1-based)
-func (sp *StepProcessor) GetStepByNumber(number int) *StepDefinition {
-	for _, step := range sp.steps {
-		if step.StepNumber == number {
-			return &step
-		}
+// GetStepTitle generates the step title dynamically
+func (sp *StepProcessor) GetStepTitle(stepIndex int) string {
+	if stepIndex < 0 || stepIndex >= len(sp.steps) {
+		return "Unknown Step"
 	}
-	return nil
+	return fmt.Sprintf("📝 Registro - Passo %d/%d", stepIndex+1, len(sp.steps))
 }
 
-// GetNextStep returns the next step after the given step
-func (sp *StepProcessor) GetNextStep(currentStepID string) *StepDefinition {
-	for i, step := range sp.steps {
-		if step.ID == currentStepID && i+1 < len(sp.steps) {
-			return &sp.steps[i+1]
-		}
+// GetStepByIndex returns a step by its index (0-based)
+func (sp *StepProcessor) GetStepByIndex(index int) *StepDefinition {
+	if index < 0 || index >= len(sp.steps) {
+		return nil
 	}
-	return nil
+	return &sp.steps[index]
 }
 
 // GetAllSteps returns all steps
@@ -122,18 +99,14 @@ func (sp *StepProcessor) GetAllSteps() []StepDefinition {
 	return sp.steps
 }
 
-// IsLastStep checks if the given step is the last one
-func (sp *StepProcessor) IsLastStep(stepID string) bool {
-	if len(sp.steps) == 0 {
-		return true
-	}
-	lastStep := sp.steps[len(sp.steps)-1]
-	return lastStep.ID == stepID
+// IsLastStep checks if the given step index is the last one
+func (sp *StepProcessor) IsLastStep(stepIndex int) bool {
+	return stepIndex == len(sp.steps)-1
 }
 
-// ProcessStep executes a step
-func (sp *StepProcessor) ProcessStep(ctx *common.ModuleContext, state *RegistrationState, stepID string) error {
-	step := sp.GetStepByID(stepID)
+// ProcessStep executes a step by index
+func (sp *StepProcessor) ProcessStep(ctx *common.ModuleContext, state *RegistrationState, stepIndex int) error {
+	step := sp.GetStepByIndex(stepIndex)
 	if step == nil {
 		return nil // Step not found, ignore
 	}
@@ -149,9 +122,9 @@ func (sp *StepProcessor) ProcessStep(ctx *common.ModuleContext, state *Registrat
 	return err
 }
 
-// HandleStepResponse handles a response to a step
-func (sp *StepProcessor) HandleStepResponse(ctx *common.ModuleContext, state *RegistrationState, stepID string, interaction interface{}) error {
-	step := sp.GetStepByID(stepID)
+// HandleStepResponse handles a response to a step by index
+func (sp *StepProcessor) HandleStepResponse(ctx *common.ModuleContext, state *RegistrationState, stepIndex int, interaction interface{}) error {
+	step := sp.GetStepByIndex(stepIndex)
 	if step == nil {
 		return nil // Step not found, ignore
 	}
