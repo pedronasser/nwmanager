@@ -120,6 +120,9 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 		return
 	}
 
+	// Store the old class before updating the player
+	oldClass := player.WarClass
+
 	// Update player class in database
 	err = updatePlayerClass(ctx, player, selectedClass)
 	if err != nil {
@@ -153,11 +156,13 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 	// Add PVP class role if it exists in the configuration
 	if classRoleID, exists := globalConfig.ClassRoleIDs[selectedClass]; exists {
 		// Remove old class roles first (if player had a different class before)
-		if player.WarClass != "" && player.WarClass != selectedClass {
-			if oldRoleID, oldExists := globalConfig.ClassRoleIDs[player.WarClass]; oldExists {
+		if oldClass != "" && oldClass != selectedClass {
+			if oldRoleID, oldExists := globalConfig.ClassRoleIDs[oldClass]; oldExists {
 				err = ctx.Session().GuildMemberRoleRemove(globalConfig.GuildID, player.DiscordID, oldRoleID)
 				if err != nil {
 					log.Printf("Error removing old class role %s: %v", oldRoleID, err)
+				} else {
+					log.Printf("Successfully removed old class role %s from player %s", oldRoleID, player.IGN)
 				}
 			}
 		}
@@ -171,18 +176,29 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 		}
 	}
 
-	// Move ticket to class-specific category and update name in a single edit
+	// Move ticket to class-specific category, update name, and sync permissions in a single edit
 	channelEdit := &discordgo.ChannelEdit{
 		Name: player.IGN,
 	}
 
 	if categoryID, exists := globalConfig.ClassCategoryIDs[selectedClass]; exists {
 		channelEdit.ParentID = categoryID
+		
+		// Get category permissions to sync them in the same edit
+		category, err := ctx.Session().Channel(categoryID)
+		if err != nil {
+			log.Printf("Error getting category %s for permission sync: %v", categoryID, err)
+		} else {
+			// Include category permissions in the same edit
+			channelEdit.PermissionOverwrites = category.PermissionOverwrites
+		}
 	}
 
 	_, err = ctx.Session().ChannelEdit(i.ChannelID, channelEdit)
 	if err != nil {
 		log.Printf("Error updating channel (name: %s, category: %v): %v", player.IGN, channelEdit.ParentID, err)
+	} else if channelEdit.ParentID != "" {
+		log.Printf("Successfully moved channel %s to category %s and synced permissions", i.ChannelID, channelEdit.ParentID)
 	}
 
 	// Optional: Delete the success message after a delay

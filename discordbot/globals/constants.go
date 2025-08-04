@@ -13,6 +13,7 @@ const (
 	PVP_CLASS_BRUISER         PVPClassType = "bruiser"
 	PVP_CLASS_RANGED_ASSASSIN PVPClassType = "ranged_assassin"
 	PVP_CLASS_HEALER_AOE      PVPClassType = "healer_aoe"
+	PVP_CLASS_OFF_META        PVPClassType = "off_meta"
 )
 
 var PVP_CLASS_NAMES = map[PVPClassType]string{
@@ -25,4 +26,5 @@ var PVP_CLASS_NAMES = map[PVPClassType]string{
 	PVP_CLASS_ICE_FLAIL:       "Ice/Flail (Cleanser)",
 	PVP_CLASS_BRUISER:         "Bruiser",
 	PVP_CLASS_RANGED_ASSASSIN: "Ranged Assassin (Bow/Musket)",
+	PVP_CLASS_OFF_META:        "Off Meta (Outras classes)",
 }
