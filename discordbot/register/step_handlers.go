@@ -80,7 +80,7 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 
 	embed := &discordgo.MessageEmbed{
 		Title:       processor.GetStepTitle(state.StepIndex),
-		Description: "**Quais das seguintes classes PVP você joga?**\n\nVocê pode selecionar várias opções.",
+		Description: "**Qual das seguintes classes você pretende jogar Guerra?**",
 		Color:       0x0099ff,
 	}
 
@@ -90,9 +90,9 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 				discordgo.SelectMenu{
 					CustomID:    "select:pvp_classes",
 					MenuType:    discordgo.StringSelectMenu,
-					Placeholder: "Selecione suas classes de PvP",
+					Placeholder: "Selecione sua classe de Guerra",
 					MinValues:   &[]int{1}[0],
-					MaxValues:   len(classOptions),
+					MaxValues:   1,
 					Options:     classOptions,
 				},
 			},

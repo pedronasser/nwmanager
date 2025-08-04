@@ -12,15 +12,17 @@ const (
 	PVP_CLASS_VOID_ICE        PVPClassType = "void_ice"
 	PVP_CLASS_BRUISER         PVPClassType = "bruiser"
 	PVP_CLASS_RANGED_ASSASSIN PVPClassType = "ranged_assassin"
+	PVP_CLASS_HEALER_AOE      PVPClassType = "healer_aoe"
 )
 
 var PVP_CLASS_NAMES = map[PVPClassType]string{
 	PVP_CLASS_DISRUPTOR:       "Disruptor",
 	PVP_CLASS_HEALER:          "Healer",
+	PVP_CLASS_HEALER_AOE:      "Healer AOE",
 	PVP_CLASS_TANK:            "Tank",
-	PVP_CLASS_FIRE_ICE:        "Fire/Ice",
-	PVP_CLASS_VOID_ICE:        "Void/Ice",
-	PVP_CLASS_ICE_FLAIL:       "Ice/Flail",
+	PVP_CLASS_FIRE_ICE:        "Fire/Ice (Mago)",
+	PVP_CLASS_VOID_ICE:        "Void/Ice (Debuffer)",
+	PVP_CLASS_ICE_FLAIL:       "Ice/Flail (Cleanser)",
 	PVP_CLASS_BRUISER:         "Bruiser",
 	PVP_CLASS_RANGED_ASSASSIN: "Ranged Assassin (Bow/Musket)",
 }

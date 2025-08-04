@@ -716,6 +716,7 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		PVPClasses:        registration.PVPClasses,
 		AvailableTimes:    registration.Hours,
 		AvailableWeekdays: registration.WeekDays,
+		WarClass:          string(registration.PVPClasses[0]), // Assuming first class is the war class
 		RegisteredAt:      &now,
 		Stats:             &types.PlayerStats{},
 	}
