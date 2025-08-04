@@ -52,6 +52,8 @@ var (
 		globals.PVP_CLASS_ICE_FLAIL,
 		globals.PVP_CLASS_BRUISER,
 		globals.PVP_CLASS_RANGED_ASSASSIN,
+		globals.PVP_CLASS_HEALER_AOE,
+		globals.PVP_CLASS_OFF_META,
 	}
 
 	TIMES = map[string]string{
