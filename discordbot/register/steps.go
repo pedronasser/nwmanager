@@ -69,6 +69,12 @@ func NewStepProcessor() *StepProcessor {
 				Creator: createWeekdaysStep,
 				Handler: handleWeekdaysStep,
 			},
+			{
+				Name:    "War Experience",
+				Type:    StepTypeButton,
+				Creator: createWarExperienceStep,
+				Handler: handleWarExperienceStep,
+			},
 		},
 	}
 }

@@ -218,9 +218,91 @@ func handleWeekdaysStep(ctx *common.ModuleContext, state *RegistrationState, int
 	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
 		// Store selected weekdays
 		state.Weekdays = i.MessageComponentData().Values
+		state.StepIndex++
 
-		// This is the last step, complete registration
-		completeRegistration(ctx, state, i)
+		// Move to next step
+		processor := GetStepProcessor()
+		return processor.ProcessStep(ctx, state, state.StepIndex)
+	}
+	return nil
+}
+
+// War Experience Step - Button/Modal
+func createWarExperienceStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
+
+	embed := &discordgo.MessageEmbed{
+		Title:       processor.GetStepTitle(state.StepIndex),
+		Description: "**Você já participou de Guerras no New World? Se sim, em qual guild?**\n\nClique em uma das opções abaixo:",
+		Color:       0x0099ff,
+	}
+
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Sim, já participei",
+					Style:    discordgo.PrimaryButton,
+					CustomID: "btn:war_yes",
+				},
+				discordgo.Button{
+					Label:    "Não participei",
+					Style:    discordgo.SecondaryButton,
+					CustomID: "btn:war_no",
+				},
+			},
+		},
+	}
+
+	return &discordgo.MessageSend{
+		Embeds:     []*discordgo.MessageEmbed{embed},
+		Components: components,
+	}, nil
+}
+
+func handleWarExperienceStep(ctx *common.ModuleContext, state *RegistrationState, interaction interface{}) error {
+	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
+		customID := i.MessageComponentData().CustomID
+
+		switch customID {
+		case "btn:war_yes":
+			// User has war experience, show modal for guild name
+			state.HasWarExperience = true
+
+			modal := discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseModal,
+				Data: &discordgo.InteractionResponseData{
+					CustomID: "modal:guild_name",
+					Title:    "Experiência em Guerras",
+					Components: []discordgo.MessageComponent{
+						discordgo.ActionsRow{
+							Components: []discordgo.MessageComponent{
+								discordgo.TextInput{
+									CustomID:    "guild_name_input",
+									Label:       "Em qual guild(s) você participou de guerras?",
+									Style:       discordgo.TextInputShort,
+									Placeholder: "Digite o nome de uma ou mais guilds",
+									Required:    true,
+									MaxLength:   100,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			dg := ctx.Session()
+			return dg.InteractionRespond(i.Interaction, &modal)
+
+		case "btn:war_no":
+			// User has no war experience
+			state.HasWarExperience = false
+			state.PreviousGuildName = ""
+
+			// This is the last step, complete registration
+			completeRegistration(ctx, state, i)
+			return nil
+		}
 	}
 	return nil
 }

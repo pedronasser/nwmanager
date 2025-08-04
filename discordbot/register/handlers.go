@@ -21,6 +21,9 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"select:pvp_classes":       handleClassSelection,
 	"select:times":             handleTimeSelection,
 	"select:weekdays":          handleWeekdaySelection,
+	"btn:war_yes":              handleWarExperienceYes,
+	"btn:war_no":               handleWarExperienceNo,
+	"modal:guild_name":         handleGuildNameModal,
 	"btn:approve_registration": approveRegistration,
 	"btn:reject_registration":  rejectRegistration,
 }
@@ -314,6 +317,75 @@ func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionC
 	}
 }
 
+func handleWarExperienceYes(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	state, exists := RegisterData[i.Member.User.ID]
+	if !exists || state.StepIndex != 4 { // War Experience is step index 4
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+		return
+	}
+
+	// Handle using the new step system
+	processor := GetStepProcessor()
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
+	if err != nil {
+		log.Printf("Error handling war experience step: %v", err)
+	}
+}
+
+func handleWarExperienceNo(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	state, exists := RegisterData[i.Member.User.ID]
+	if !exists || state.StepIndex != 4 { // War Experience is step index 4
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+		return
+	}
+
+	// Reply to interaction first
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Resposta registrada!", 1*time.Second)
+
+	// Handle using the new step system
+	processor := GetStepProcessor()
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
+	if err != nil {
+		log.Printf("Error handling war experience step: %v", err)
+	}
+}
+
+func handleGuildNameModal(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	state, exists := RegisterData[i.Member.User.ID]
+	if !exists || state.StepIndex != 4 { // War Experience is step index 4
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+		return
+	}
+
+	// Extract guild name from modal
+	data := i.ModalSubmitData()
+	var guildName string
+	for _, component := range data.Components {
+		if actionRow, ok := component.(*discordgo.ActionsRow); ok {
+			for _, comp := range actionRow.Components {
+				if textInput, ok := comp.(*discordgo.TextInput); ok && textInput.CustomID == "guild_name_input" {
+					guildName = strings.TrimSpace(textInput.Value)
+					break
+				}
+			}
+		}
+	}
+
+	if guildName == "" {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Nome da guild não pode estar vazio.", 5*time.Second)
+		return
+	}
+
+	// Store guild name and complete registration
+	state.PreviousGuildName = guildName
+
+	// Reply to interaction first
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Informações registradas com sucesso!", 1*time.Second)
+
+	// Complete registration
+	completeRegistration(ctx, state, i)
+}
+
 func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i *discordgo.InteractionCreate) {
 	dg := ctx.Session()
 
@@ -416,6 +488,22 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
+
+	// Add war experience information
+	warExperienceValue := "Não participou de guerras"
+	if state.HasWarExperience {
+		if state.PreviousGuildName != "" {
+			warExperienceValue = fmt.Sprintf("Sim - Guild: %s", state.PreviousGuildName)
+		} else {
+			warExperienceValue = "Sim"
+		}
+	}
+
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "⚔️ Experiência em Guerras",
+		Value:  warExperienceValue,
+		Inline: false,
+	})
 
 	if isReRegistration {
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
