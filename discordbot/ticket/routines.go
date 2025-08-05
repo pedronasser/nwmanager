@@ -3,10 +3,12 @@ package ticket
 import (
 	"fmt"
 	"log"
+	"nwmanager/database"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
+	"os"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -45,6 +47,8 @@ func memberRoleMonitoringRoutine(ctx *common.ModuleContext) {
 					log.Printf("Error processing member %s: %v", member.User.ID, err)
 				}
 			}
+
+			routineExportPlayersCSV(ctx, ctx.DB())
 
 		case <-ctx.Context.Done():
 			return
@@ -203,4 +207,27 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
 	}
 
 	return channel, nil
+}
+
+func routineExportPlayersCSV(ctx *common.ModuleContext, db database.Database) {
+	players, err := types.GetActivePlayers(ctx.Context, db)
+	if err != nil {
+		log.Fatalf("Cannot get players: %v", err)
+	}
+
+	csvFile, err := os.Create("players_new.csv")
+	if err != nil {
+		log.Fatalf("Cannot create file: %v", err)
+	}
+	defer csvFile.Close()
+
+	_, _ = csvFile.WriteString("Name,Classe")
+	for _, player := range players {
+		_, _ = csvFile.WriteString("\n" + player.IGN + "," + player.WarClass)
+	}
+
+	os.Remove("static/players.csv")
+	os.Rename("players_new.csv", "static/players.csv")
+
+	log.Println("Exported players to players.csv")
 }

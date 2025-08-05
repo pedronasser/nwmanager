@@ -11,6 +11,7 @@ import (
 	"nwmanager/discordbot/register"
 	"nwmanager/discordbot/ticket"
 	"nwmanager/discordbot/voice_channel"
+	"nwmanager/discordbot/web"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,8 +36,8 @@ func main() {
 	Token = os.Getenv("DISCORD_BOT_TOKEN")
 
 	ctx := context.Background()
-	// os.MkdirAll("static", os.ModePerm)
-	// web.Setup(ctx)
+	os.MkdirAll("static", os.ModePerm)
+	web.Setup(ctx)
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Token)
