@@ -202,6 +202,14 @@ func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, p
 						Name: "⚔️",
 					},
 				},
+				discordgo.Button{
+					Label:    "Avisar Ausência",
+					Style:    discordgo.SecondaryButton,
+					CustomID: "ticket:notify_absence",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: "📅",
+					},
+				},
 				// discordgo.Button{
 				// 	Label:    "Ver Build Atual",
 				// 	Style:    discordgo.SecondaryButton,

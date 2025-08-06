@@ -20,7 +20,10 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"ticket:view_build":      handleViewBuild,
 	"ticket:close_thread":    handleCloseThread,
 	"ticket:submit_build":    handleSubmitBuild,
+	"ticket:notify_absence":  handleNotifyAbsence,
+	"modal:absence_form":     handleAbsenceModal,
 	"select:class_selection": handleClassSelection,
+	"/ausencia":              handleNotifyAbsence, // Slash command uses same handler as button
 }
 
 func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
@@ -47,6 +50,116 @@ func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) 
 	// Send instructions and confirm button in thread
 	setupBuildThread(ctx, thread.ID, player.IGN)
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, fmt.Sprintf("Thread criada: <#%s>", thread.ID), 5*time.Second)
+}
+
+func handleNotifyAbsence(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	// Create modal for absence notification
+	modal := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "absence_date",
+					Label:       "Data da Ausência (DD/MM/AAAA)",
+					Style:       discordgo.TextInputShort,
+					Placeholder: "Ex: 15/08/2025",
+					Required:    true,
+					MaxLength:   10,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "absence_reason",
+					Label:       "Motivo (Opcional)",
+					Style:       discordgo.TextInputParagraph,
+					Placeholder: "Descreva brevemente o motivo da ausência...",
+					Required:    false,
+					MaxLength:   500,
+				},
+			},
+		},
+	}
+
+	err := discordutils.SendModal(ctx.Session(), i, "modal:absence_form", "Avisar Ausência", modal...)
+	if err != nil {
+		log.Printf("Error sending absence modal: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao abrir formulário de ausência.", 5*time.Second)
+	}
+}
+
+func handleAbsenceModal(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	// Get form data
+	data := i.ModalSubmitData()
+	var absenceDate, absenceReason string
+
+	for _, component := range data.Components {
+		if actionRow, ok := component.(*discordgo.ActionsRow); ok {
+			for _, comp := range actionRow.Components {
+				if textInput, ok := comp.(*discordgo.TextInput); ok {
+					switch textInput.CustomID {
+					case "absence_date":
+						absenceDate = textInput.Value
+					case "absence_reason":
+						absenceReason = textInput.Value
+					}
+				}
+			}
+		}
+	}
+
+	// Get player data
+	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), i.Member.User.ID)
+	if err != nil || player == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao encontrar dados do jogador.", 5*time.Second)
+		return
+	}
+
+	// Get config for absence channel
+	ticketConfig := GetModuleConfig(ctx)
+	if ticketConfig.AbsenceChannelID == "" {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Canal de ausências não configurado.", 5*time.Second)
+		return
+	}
+
+	// Create absence notification embed
+	embed := &discordgo.MessageEmbed{
+		Title:     "📅 Notificação de Ausência",
+		Color:     0xffa500, // Orange color
+		Timestamp: time.Now().Format(time.RFC3339),
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Jogador",
+				Value:  fmt.Sprintf("%s (<@%s>)", player.IGN, player.DiscordID),
+				Inline: true,
+			},
+			{
+				Name:   "Data da Ausência",
+				Value:  absenceDate,
+				Inline: true,
+			},
+		},
+	}
+
+	// Add reason field if provided
+	if absenceReason != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Motivo",
+			Value:  absenceReason,
+			Inline: false,
+		})
+	}
+
+	// Send notification to absence channel
+	_, err = ctx.Session().ChannelMessageSendEmbed(ticketConfig.AbsenceChannelID, embed)
+	if err != nil {
+		log.Printf("Error sending absence notification: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao enviar notificação de ausência.", 5*time.Second)
+		return
+	}
+
+	// Respond to user
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Ausência notificada com sucesso!", 0)
 }
 
 func handleSendQuestion(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
@@ -421,6 +534,8 @@ func HandleTicketAction(ctx *common.ModuleContext, guildID string) func(*discord
 			}
 		case discordgo.InteractionModalSubmit:
 			handlerKey = i.ModalSubmitData().CustomID
+		case discordgo.InteractionApplicationCommand:
+			handlerKey = "/" + i.ApplicationCommandData().Name
 		}
 
 		if handler, exists := handlers[handlerKey]; exists {

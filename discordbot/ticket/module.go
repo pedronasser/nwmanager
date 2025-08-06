@@ -7,6 +7,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 const ModuleName = "ticket"
@@ -14,6 +16,7 @@ const ModuleName = "ticket"
 type TicketConfig struct {
 	Enabled          bool   `json:"enabled"`
 	TicketCategoryID string `json:"ticket_category_id"`
+	AbsenceChannelID string `json:"absence_channel_id"`
 	CheckInterval    int    `json:"check_interval_seconds"`
 }
 
@@ -25,17 +28,45 @@ func (s *TicketModule) Name() string {
 
 func (s *TicketModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
 	cfg := config.(*TicketConfig)
+	globalCfg := ctx.Config("globals").(*globals.GlobalsConfig)
+	dg := ctx.Session()
+
 	if !cfg.Enabled {
+		log.Println("Ticket module is disabled, removing commands...")
+		// Remove slash command when module is disabled
+		cmds, err := dg.ApplicationCommands(globalCfg.AppID, globalCfg.GuildID)
+		if err == nil {
+			for _, cmd := range cmds {
+				if cmd.Name == "ausencia" {
+					err = dg.ApplicationCommandDelete(globalCfg.AppID, globalCfg.GuildID, cmd.ID)
+					if err != nil {
+						log.Printf("Error deleting /ausencia command: %v", err)
+					} else {
+						log.Println("Removed /ausencia slash command")
+					}
+					break
+				}
+			}
+		}
 		return false, nil
 	}
 
 	log.Println("Ticket module is enabled, setting up...")
 
-	globalCfg := ctx.Config("globals").(*globals.GlobalsConfig)
-	dg := ctx.Session()
-
 	// Add interaction handlers
 	dg.AddHandler(HandleTicketAction(ctx, globalCfg.GuildID))
+
+	// Register slash command for absence notification
+	_, err := dg.ApplicationCommandCreate(globalCfg.AppID, globalCfg.GuildID, &discordgo.ApplicationCommand{
+		Name:        "ausencia",
+		Description: "Avisar ausência para a guild",
+		Type:        discordgo.ChatApplicationCommand,
+	})
+	if err != nil {
+		log.Printf("Failed to create /ausencia command: %v", err)
+	} else {
+		log.Println("Created /ausencia slash command")
+	}
 
 	// Start background monitoring routine
 	go memberRoleMonitoringRoutine(ctx)
@@ -49,6 +80,7 @@ func (s *TicketModule) DefaultConfig() any {
 	return &TicketConfig{
 		Enabled:          IsModuleEnabledFromEnv,
 		TicketCategoryID: os.Getenv("TICKET_CATEGORY_ID"),
+		AbsenceChannelID: os.Getenv("ABSENCE_CHANNEL_ID"),
 		CheckInterval:    300, // 5 minutes default
 	}
 }
