@@ -160,18 +160,8 @@ func setupQuestionThread(ctx *common.ModuleContext, threadID, playerIGN string) 
 	}
 }
 
-func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, player *types.Player) error {
-	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("🎫 Ticket - %s", player.IGN),
-		Description: fmt.Sprintf("Bem-vindo(a) ao seu ticket pessoal, **%s**!", player.IGN),
-		Color:       0x00ff00,
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Footer: &discordgo.MessageEmbedFooter{
-			Text: "Use os botões abaixo para interagir com o ticket",
-		},
-	}
-
-	components := []discordgo.MessageComponent{
+func createTicketMessageComponents() []discordgo.MessageComponent {
+	return []discordgo.MessageComponent{
 		// discordgo.ActionsRow{
 		// 	Components: []discordgo.MessageComponent{
 		// 		discordgo.Button{
@@ -221,6 +211,20 @@ func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, p
 			},
 		},
 	}
+}
+
+func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, player *types.Player) error {
+	embed := &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("🎫 Ticket - %s", player.IGN),
+		Description: fmt.Sprintf("Bem-vindo(a) ao seu ticket pessoal, **%s**!", player.IGN),
+		Color:       0x00ff00,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Use os botões abaixo para interagir com o ticket",
+		},
+	}
+
+	components := createTicketMessageComponents()
 
 	message, err := ctx.Session().ChannelMessageSendComplex(channel.ID, &discordgo.MessageSend{
 		Embeds:     []*discordgo.MessageEmbed{embed},
@@ -248,5 +252,54 @@ func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, p
 		// Don't return error as the ticket channel was created successfully
 	}
 
+	return nil
+}
+
+func updateExistingTicketMessages(ctx *common.ModuleContext) error {
+	log.Println("Updating existing ticket messages with latest components...")
+
+	// Get all active tickets
+	activeTickets, err := getAllActiveTickets(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active tickets: %w", err)
+	}
+
+	components := createTicketMessageComponents()
+	updatedCount := 0
+	errorCount := 0
+
+	for _, ticket := range activeTickets {
+		// Try to get the original message
+		message, err := ctx.Session().ChannelMessage(ticket.ChannelID, ticket.MessageID)
+		if err != nil {
+			log.Printf("Error fetching message %s in channel %s: %v", ticket.MessageID, ticket.ChannelID, err)
+			errorCount++
+			continue
+		}
+
+		// Preserve the original embed but update components
+		var embeds []*discordgo.MessageEmbed
+		if len(message.Embeds) > 0 {
+			embeds = message.Embeds
+		}
+
+		// Update the message with new components
+		_, err = ctx.Session().ChannelMessageEditComplex(&discordgo.MessageEdit{
+			Channel:    ticket.ChannelID,
+			ID:         ticket.MessageID,
+			Embeds:     &embeds,
+			Components: &components,
+		})
+		if err != nil {
+			log.Printf("Error updating message %s in channel %s: %v", ticket.MessageID, ticket.ChannelID, err)
+			errorCount++
+			continue
+		}
+
+		updatedCount++
+		log.Printf("Updated ticket message for player %s (channel: %s)", ticket.PlayerIGN, ticket.ChannelID)
+	}
+
+	log.Printf("Ticket message update completed. Updated: %d, Errors: %d", updatedCount, errorCount)
 	return nil
 }

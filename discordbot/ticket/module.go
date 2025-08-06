@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -67,6 +68,16 @@ func (s *TicketModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	} else {
 		log.Println("Created /ausencia slash command")
 	}
+
+	// Update existing ticket messages with latest components
+	go func() {
+		// Wait a bit for the bot to be fully ready
+		time.Sleep(2 * time.Second)
+		err := updateExistingTicketMessages(ctx)
+		if err != nil {
+			log.Printf("Error updating existing ticket messages: %v", err)
+		}
+	}()
 
 	// Start background monitoring routine
 	go memberRoleMonitoringRoutine(ctx)
