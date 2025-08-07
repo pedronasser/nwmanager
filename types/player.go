@@ -143,7 +143,7 @@ func GetPlayers(ctx context.Context, db database.Database) ([]Player, error) {
 func GetActivePlayers(ctx context.Context, db database.Database) ([]Player, error) {
 	cursor, err := db.Collection(globals.DB_PREFIX+PlayerCollection).Find(ctx, bson.M{
 		"archived_at": bson.M{"$eq": nil},
-		"wasr_class":  bson.M{"$ne": nil},
+		"war_class":   bson.M{"$ne": nil},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get players: %v", err)
