@@ -88,6 +88,9 @@ func (s *RegisterModule) Setup(ctx *common.ModuleContext, config any) (bool, err
 	// Add message handler for welcome channel cleanup
 	dg.AddHandler(HandleWelcomeChannelMessages(ctx))
 
+	// Start player cleanup routine
+	go playerCleanupRoutine(ctx)
+
 	return true, nil
 }
 
