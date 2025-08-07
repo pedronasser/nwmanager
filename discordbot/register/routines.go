@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	PLAYER_CLEANUP_INTERVAL = 24 * time.Hour // Check once per day
+	PLAYER_CLEANUP_INTERVAL = 1 * time.Hour // Check once per hour
 )
 
 // playerCleanupRoutine checks all players in the database and archives those
@@ -21,52 +21,60 @@ const (
 func playerCleanupRoutine(ctx *common.ModuleContext) {
 	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
 
+	// Execute immediately on startup
+	performPlayerCleanup(ctx, globalConfig)
+
 	ticker := time.NewTicker(PLAYER_CLEANUP_INTERVAL)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Println("Starting player cleanup routine...")
-
-			// Get all players from database
-			players, err := types.GetActivePlayers(ctx.Context, ctx.DB())
-			if err != nil {
-				log.Printf("Error fetching players from database: %v", err)
-				continue
-			}
-
-			archivedCount := 0
-			checkedCount := 0
-
-			// Check each player
-			for _, player := range players {
-				checkedCount++
-
-				shouldArchive, reason, err := shouldArchivePlayer(ctx, &player, globalConfig.GuildID, globalConfig.MemberRoleID)
-				if err != nil {
-					log.Printf("Error checking player %s (%s): %v", player.IGN, player.DiscordID, err)
-					continue
-				}
-
-				if shouldArchive {
-					err = types.ArchivePlayer(ctx.Context, ctx.DB(), &player)
-					if err != nil {
-						log.Printf("Error archiving player %s (%s): %v", player.IGN, player.DiscordID, err)
-						continue
-					}
-
-					archivedCount++
-					log.Printf("Archived player %s (%s): %s", player.IGN, player.DiscordID, reason)
-				}
-			}
-
-			log.Printf("Player cleanup routine completed. Checked %d players, archived %d players", checkedCount, archivedCount)
+			performPlayerCleanup(ctx, globalConfig)
 
 		case <-ctx.Context.Done():
 			return
 		}
 	}
+}
+
+// performPlayerCleanup performs the actual player cleanup logic
+func performPlayerCleanup(ctx *common.ModuleContext, globalConfig *globals.GlobalsConfig) {
+	log.Println("Starting player cleanup routine...")
+
+	// Get all players from database
+	players, err := types.GetActivePlayers(ctx.Context, ctx.DB())
+	if err != nil {
+		log.Printf("Error fetching players from database: %v", err)
+		return
+	}
+
+	archivedCount := 0
+	checkedCount := 0
+
+	// Check each player
+	for _, player := range players {
+		checkedCount++
+
+		shouldArchive, reason, err := shouldArchivePlayer(ctx, &player, globalConfig.GuildID, globalConfig.MemberRoleID)
+		if err != nil {
+			log.Printf("Error checking player %s (%s): %v", player.IGN, player.DiscordID, err)
+			continue
+		}
+
+		if shouldArchive {
+			err = types.ArchivePlayer(ctx.Context, ctx.DB(), &player)
+			if err != nil {
+				log.Printf("Error archiving player %s (%s): %v", player.IGN, player.DiscordID, err)
+				continue
+			}
+
+			archivedCount++
+			log.Printf("Archived player %s (%s): %s", player.IGN, player.DiscordID, reason)
+		}
+	}
+
+	log.Printf("Player cleanup routine completed. Checked %d players, archived %d players", checkedCount, archivedCount)
 }
 
 // shouldArchivePlayer checks if a player should be archived based on their Discord status
