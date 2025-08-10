@@ -188,10 +188,10 @@ func startRegistrationWithType(ctx *common.ModuleContext, i *discordgo.Interacti
 	dg := ctx.Session()
 
 	// Check if user already has a registration in progress
-	if _, exists := RegisterData[i.Member.User.ID]; exists {
-		discordutils.ReplyEphemeralMessage(dg, i, "❌ Você já possui um registro em andamento!", 5*time.Second)
-		return
-	}
+	// if _, exists := RegisterData[i.Member.User.ID]; exists {
+	// 	discordutils.ReplyEphemeralMessage(dg, i, "❌ Você já possui um registro em andamento!", 5*time.Second)
+	// 	return
+	// }
 
 	// Check if user already has the member role (is already fully registered)
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)

@@ -1,7 +1,5 @@
 package register
 
-import "nwmanager/discordbot/globals"
-
 const (
 	// User can select multiple times
 	TIME_MORNING   = "morning"
@@ -43,19 +41,6 @@ const (
 )
 
 var (
-	PVP_CLASS_OPTIONS = []globals.PVPClassType{
-		globals.PVP_CLASS_DISRUPTOR,
-		globals.PVP_CLASS_HEALER,
-		globals.PVP_CLASS_TANK,
-		globals.PVP_CLASS_FIRE_ICE,
-		globals.PVP_CLASS_VOID_ICE,
-		globals.PVP_CLASS_ICE_FLAIL,
-		globals.PVP_CLASS_BRUISER,
-		globals.PVP_CLASS_RANGED_ASSASSIN,
-		globals.PVP_CLASS_HEALER_AOE,
-		globals.PVP_CLASS_OFF_META,
-	}
-
 	TIMES = map[string]string{
 		TIME_MORNING:   TIME_NAME_MORNING,
 		TIME_AFTERNOON: TIME_NAME_AFTERNOON,

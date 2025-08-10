@@ -62,7 +62,7 @@ func createPVPClassesStep(ctx *common.ModuleContext, state *RegistrationState) (
 	processor := GetStepProcessor()
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
 	var classOptions []discordgo.SelectMenuOption
-	for _, classKey := range PVP_CLASS_OPTIONS {
+	for _, classKey := range globals.PVP_CLASS_OPTIONS {
 		className := globals.PVP_CLASS_NAMES[classKey]
 		classEmoji := globalCfg.ClassEmojiIDs[string(classKey)]
 		option := discordgo.SelectMenuOption{
