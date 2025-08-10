@@ -18,6 +18,8 @@ func memberRoleMonitoringRoutine(ctx *common.ModuleContext) {
 	config := GetModuleConfig(ctx)
 	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
 
+	routineExportPlayersCSV(ctx, ctx.DB())
+
 	ticker := time.NewTicker(time.Duration(config.CheckInterval) * time.Second)
 	defer ticker.Stop()
 

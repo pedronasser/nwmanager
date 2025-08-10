@@ -5,6 +5,7 @@ import (
 	"nwmanager/discordbot/common"
 	"nwmanager/helpers"
 	"os"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -54,7 +55,7 @@ func (s *GlobalsModule) Setup(ctx *common.ModuleContext, config any) (bool, erro
 		log.Fatalf("Cannot add guild to state: %v", err)
 	}
 
-	DB_PREFIX = ctx.GuildName() + "_"
+	DB_PREFIX = strings.ReplaceAll(strings.ToLower(ctx.GuildName()), " ", "_") + "_"
 	ADMIN_ROLE_ID = cfg.AdminRoleID
 
 	return true, nil
