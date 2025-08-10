@@ -17,8 +17,9 @@ type GlobalsConfig struct {
 	GuildID string
 
 	// DB configurable values
-	AdminRoleID  string `json:"admin_role_id"`
-	MemberRoleID string `json:"member_role_id"`
+	AdminRoleID    string `json:"admin_role_id"`
+	MemberRoleID   string `json:"member_role_id"`
+	CompleteRoleID string `json:"complete_role_id"`
 
 	ClassRoleIDs     map[string]string `json:"class_role_ids"`
 	ClassEmojiIDs    map[string]string `json:"class_emoji_ids"`
@@ -64,13 +65,15 @@ func (s *GlobalsModule) DefaultConfig() any {
 	var GuildID = os.Getenv("DISCORD_GUILD_ID")
 	ADMIN_ROLE_ID = helpers.LoadOrDefault("ADMIN_ROLE_ID", "")
 	MEMBER_ROLE_ID := helpers.LoadOrDefault("MEMBER_ROLE_ID", "")
+	COMPLETE_ROLE_ID := helpers.LoadOrDefault("COMPLETE_ROLE_ID", "")
 
 	return &GlobalsConfig{
 		AppID:   AppID,
 		GuildID: GuildID,
 
-		AdminRoleID:  ADMIN_ROLE_ID,
-		MemberRoleID: MEMBER_ROLE_ID,
+		AdminRoleID:    ADMIN_ROLE_ID,
+		MemberRoleID:   MEMBER_ROLE_ID,
+		CompleteRoleID: COMPLETE_ROLE_ID,
 
 		ClassRoleIDs:     make(map[string]string),
 		ClassEmojiIDs:    make(map[string]string),

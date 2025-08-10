@@ -17,17 +17,18 @@ const RegisterCollection = "register"
 
 // Guild register
 type Register struct {
-	ID         primitive.ObjectID     `bson:"_id" json:"id"`
-	InGameName string                 `bson:"ingame_name" json:"in_game_name"`
-	DiscordID  string                 `bson:"discord_id" json:"discord_id"`
-	WeekDays   []string               `bson:"week_days" json:"week_days"`
-	Hours      []string               `bson:"hours" json:"hours"`
-	PVPClasses []globals.PVPClassType `bson:"pvp_classes" json:"pvp_classes"`
-	CreatedAt  time.Time              `bson:"created_at" json:"created_at"`
-	ApprovedBy string                 `bson:"approved_by" json:"approved_by"`
-	ApprovedAt *time.Time             `bson:"approved_at" json:"approved_at"`
-	RejectedBy string                 `bson:"rejected_by" json:"rejected_by"`
-	RejectedAt *time.Time             `bson:"rejected_at" json:"rejected_at"`
+	ID               primitive.ObjectID     `bson:"_id" json:"id"`
+	InGameName       string                 `bson:"ingame_name" json:"in_game_name"`
+	DiscordID        string                 `bson:"discord_id" json:"discord_id"`
+	WeekDays         []string               `bson:"week_days" json:"week_days"`
+	Hours            []string               `bson:"hours" json:"hours"`
+	PVPClasses       []globals.PVPClassType `bson:"pvp_classes" json:"pvp_classes"`
+	RegistrationType string                 `bson:"registration_type" json:"registration_type"`
+	CreatedAt        time.Time              `bson:"created_at" json:"created_at"`
+	ApprovedBy       string                 `bson:"approved_by" json:"approved_by"`
+	ApprovedAt       *time.Time             `bson:"approved_at" json:"approved_at"`
+	RejectedBy       string                 `bson:"rejected_by" json:"rejected_by"`
+	RejectedAt       *time.Time             `bson:"rejected_at" json:"rejected_at"`
 }
 
 func InsertRegister(ctx context.Context, db database.Database, register *Register) error {

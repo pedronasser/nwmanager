@@ -56,7 +56,7 @@ func performPlayerCleanup(ctx *common.ModuleContext, globalConfig *globals.Globa
 	for _, player := range players {
 		checkedCount++
 
-		shouldArchive, reason, err := shouldArchivePlayer(ctx, &player, globalConfig.GuildID, globalConfig.MemberRoleID)
+		shouldArchive, reason, err := shouldArchivePlayer(ctx, &player, globalConfig.GuildID, globalConfig.MemberRoleID, globalConfig.CompleteRoleID)
 		if err != nil {
 			log.Printf("Error checking player %s (%s): %v", player.IGN, player.DiscordID, err)
 			continue
@@ -78,7 +78,7 @@ func performPlayerCleanup(ctx *common.ModuleContext, globalConfig *globals.Globa
 }
 
 // shouldArchivePlayer checks if a player should be archived based on their Discord status
-func shouldArchivePlayer(ctx *common.ModuleContext, player *types.Player, guildID string, memberRoleID string) (bool, string, error) {
+func shouldArchivePlayer(ctx *common.ModuleContext, player *types.Player, guildID string, memberRoleID string, completeRoleID string) (bool, string, error) {
 	session := ctx.Session()
 
 	// Try to get the member from the guild
@@ -92,11 +92,14 @@ func shouldArchivePlayer(ctx *common.ModuleContext, player *types.Player, guildI
 		return false, "", fmt.Errorf("error fetching guild member: %w", err)
 	}
 
-	// Check if member has the required role
-	if !discordutils.HasRole(member, memberRoleID) {
-		return true, "member does not have the required member role", nil
+	// Check if member has either the member role or the complete role
+	hasMemberRole := discordutils.HasRole(member, memberRoleID)
+	hasCompleteRole := completeRoleID != "" && discordutils.HasRole(member, completeRoleID)
+
+	if !hasMemberRole && !hasCompleteRole {
+		return true, "member does not have the required member or complete role", nil
 	}
 
-	// Player is still in guild and has the member role
+	// Player is still in guild and has at least one of the required roles
 	return false, "", nil
 }

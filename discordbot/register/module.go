@@ -28,6 +28,13 @@ var RegisterData = make(map[string]*RegistrationState)
 // Global step processor instance
 var stepProcessor *StepProcessor
 
+type RegistrationType string
+
+const (
+	RegistrationTypeMember   RegistrationType = "member"
+	RegistrationTypeComplete RegistrationType = "complete"
+)
+
 type RegistrationState struct {
 	DiscordID         string
 	TopicID           string // Registration channel ID
@@ -37,8 +44,9 @@ type RegistrationState struct {
 	Times             []string
 	Weekdays          []string
 	MessageID         string
-	HasWarExperience  bool   // Whether user has war experience
-	PreviousGuildName string // Name of previous guild (only if HasWarExperience is true)
+	HasWarExperience  bool             // Whether user has war experience
+	PreviousGuildName string           // Name of previous guild (only if HasWarExperience is true)
+	RegistrationType  RegistrationType // Type of registration (member or complete)
 }
 
 // GetStepProcessor returns the global step processor instance

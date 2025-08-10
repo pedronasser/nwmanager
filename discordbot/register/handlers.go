@@ -17,15 +17,16 @@ import (
 )
 
 var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
-	"btn:start_registration":   startRegistration,
-	"select:pvp_classes":       handleClassSelection,
-	"select:times":             handleTimeSelection,
-	"select:weekdays":          handleWeekdaySelection,
-	"btn:war_yes":              handleWarExperienceYes,
-	"btn:war_no":               handleWarExperienceNo,
-	"modal:guild_name":         handleGuildNameModal,
-	"btn:approve_registration": approveRegistration,
-	"btn:reject_registration":  rejectRegistration,
+	"btn:start_registration":          startRegistration,
+	"btn:start_complete_registration": startCompleteRegistration,
+	"select:pvp_classes":              handleClassSelection,
+	"select:times":                    handleTimeSelection,
+	"select:weekdays":                 handleWeekdaySelection,
+	"btn:war_yes":                     handleWarExperienceYes,
+	"btn:war_no":                      handleWarExperienceNo,
+	"modal:guild_name":                handleGuildNameModal,
+	"btn:approve_registration":        approveRegistration,
+	"btn:reject_registration":         rejectRegistration,
 }
 
 func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
@@ -52,7 +53,7 @@ func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
 				for _, component := range msg.Components {
 					if actionRow, ok := component.(*discordgo.ActionsRow); ok {
 						for _, comp := range actionRow.Components {
-							if button, ok := comp.(*discordgo.Button); ok && button.CustomID == "btn:start_registration" {
+							if button, ok := comp.(*discordgo.Button); ok && (button.CustomID == "btn:start_registration" || button.CustomID == "btn:start_complete_registration") {
 								log.Printf("Welcome message already exists in channel %s", channelID)
 								return nil // Message already exists, don't send another
 							}
@@ -65,7 +66,7 @@ func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
 
 	// Send welcome message with registration button
 	embed := &discordgo.MessageEmbed{
-		Title:       "🎮 Registrar na Guild",
+		Title:       fmt.Sprintf("🎮 Registrar na %s", ctx.GuildName()),
 		Description: cfg.WelcomeMessage,
 		Color:       0x00ff00,
 		Timestamp:   time.Now().Format(time.RFC3339),
@@ -75,11 +76,19 @@ func setupWelcomeChannel(ctx *common.ModuleContext, channelID string) error {
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
-					Label:    "Iniciar Recrutamento",
+					Label:    "Quero Ser Recrutado",
 					Style:    discordgo.PrimaryButton,
 					CustomID: "btn:start_registration",
 					Emoji: &discordgo.ComponentEmoji{
 						Name: "📝",
+					},
+				},
+				discordgo.Button{
+					Label:    "Quero ser complete",
+					Style:    discordgo.SecondaryButton,
+					CustomID: "btn:start_complete_registration",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: "💪",
 					},
 				},
 			},
@@ -167,6 +176,14 @@ func handleWelcomeChannelMessage(ctx *common.ModuleContext, s *discordgo.Session
 }
 
 func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	startRegistrationWithType(ctx, i, RegistrationTypeMember)
+}
+
+func startCompleteRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	startRegistrationWithType(ctx, i, RegistrationTypeComplete)
+}
+
+func startRegistrationWithType(ctx *common.ModuleContext, i *discordgo.InteractionCreate, registrationType RegistrationType) {
 	cfg := GetModuleConfig(ctx)
 	dg := ctx.Session()
 
@@ -183,13 +200,32 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 	// 	return
 	// }
 
-	// Create private text channel for registration
-	channelName := fmt.Sprintf("registro-%s", strings.ToLower(i.Member.User.Username))
+	// Create private text channel for registration with appropriate prefix
+	var channelPrefix string
+	if registrationType == RegistrationTypeComplete {
+		channelPrefix = "complete"
+	} else {
+		channelPrefix = "registro"
+	}
+	channelName := fmt.Sprintf("%s-%s", channelPrefix, strings.ToLower(i.Member.User.Username))
 
 	// Check for existing registration channels with the same name and delete them
 	err := cleanupExistingRegistrationChannels(dg, i.GuildID, channelName, cfg.RegistrationCategoryID)
 	if err != nil {
 		log.Printf("Error cleaning up existing registration channels: %v", err)
+		// Continue with creation despite cleanup errors
+	}
+
+	// Also cleanup any other registration type channel for this user
+	var otherChannelName string
+	if registrationType == RegistrationTypeComplete {
+		otherChannelName = fmt.Sprintf("registro-%s", strings.ToLower(i.Member.User.Username))
+	} else {
+		otherChannelName = fmt.Sprintf("complete-%s", strings.ToLower(i.Member.User.Username))
+	}
+	err = cleanupExistingRegistrationChannels(dg, i.GuildID, otherChannelName, cfg.RegistrationCategoryID)
+	if err != nil {
+		log.Printf("Error cleaning up other registration type channels: %v", err)
 		// Continue with creation despite cleanup errors
 	}
 
@@ -245,9 +281,10 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 	// Initialize registration state
 	RegisterData[i.Member.User.ID] = &RegistrationState{
-		DiscordID: i.Member.User.ID,
-		TopicID:   channel.ID,
-		StepIndex: 0, // Start with first step (0-based index)
+		DiscordID:        i.Member.User.ID,
+		TopicID:          channel.ID,
+		StepIndex:        0, // Start with first step (0-based index)
+		RegistrationType: registrationType,
 	}
 
 	// Start the first step using the new step processor
@@ -426,13 +463,14 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 
 	// Create registration record in database
 	registration := &types.Register{
-		ID:         primitive.NewObjectID(),
-		DiscordID:  state.DiscordID,
-		InGameName: state.IGN,
-		WeekDays:   state.Weekdays,   // Can be nil/empty if step was skipped
-		Hours:      state.Times,      // Can be nil/empty if step was skipped
-		PVPClasses: state.PVPClasses, // Using weapons field for PVP classes
-		CreatedAt:  time.Now(),
+		ID:               primitive.NewObjectID(),
+		DiscordID:        state.DiscordID,
+		InGameName:       state.IGN,
+		WeekDays:         state.Weekdays,   // Can be nil/empty if step was skipped
+		Hours:            state.Times,      // Can be nil/empty if step was skipped
+		PVPClasses:       state.PVPClasses, // Using weapons field for PVP classes
+		RegistrationType: string(state.RegistrationType),
+		CreatedAt:        time.Now(),
 	}
 
 	// Store in database (implement this based on your database layer)
@@ -444,7 +482,13 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 	}
 
 	// Reply to interaction first
-	discordutils.ReplyEphemeralMessage(dg, i, "✅ Dias selecionados com sucesso!", 1*time.Second)
+	var successMessage string
+	if state.RegistrationType == RegistrationTypeComplete {
+		successMessage = "✅ Registro complete enviado com sucesso!"
+	} else {
+		successMessage = "✅ Dias selecionados com sucesso!"
+	}
+	discordutils.ReplyEphemeralMessage(dg, i, successMessage, 1*time.Second)
 
 	// Send completion message with admin approval buttons
 	sendCompletionMessage(ctx, state, registration)
@@ -496,8 +540,15 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 		description = "Seu novo registro foi enviado com sucesso! Este registro substituirá seus dados anteriores após aprovação."
 	}
 
+	var title string
+	if state.RegistrationType == RegistrationTypeComplete {
+		title = "📋 Registro Complete - Aguardando Aprovação"
+	} else {
+		title = "📋 Registro Completo - Aguardando Aprovação"
+	}
+
 	embed := &discordgo.MessageEmbed{
-		Title:       "📋 Registro Completo - Aguardando Aprovação",
+		Title:       title,
 		Description: description,
 		Color:       0xffaa00,
 		Fields: []*discordgo.MessageEmbedField{
@@ -549,6 +600,17 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:   "⚔️ Experiência em Guerras",
 		Value:  warExperienceValue,
+		Inline: false,
+	})
+
+	// Add registration type field
+	registrationTypeValue := "Membro"
+	if state.RegistrationType == RegistrationTypeComplete {
+		registrationTypeValue = "Complete"
+	}
+	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+		Name:   "📝 Tipo de Registro",
+		Value:  registrationTypeValue,
 		Inline: false,
 	})
 
@@ -796,15 +858,25 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		return fmt.Errorf("error creating player: %v", err)
 	}
 
-	// Assign member role
+	// Assign appropriate role based on registration type
 	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
-	if globalCfg.MemberRoleID != "" && guildID != "" {
+	if guildID != "" {
 		dg := ctx.Session()
-		err = dg.GuildMemberRoleAdd(guildID, registration.DiscordID, globalCfg.MemberRoleID)
-		if err != nil {
-			log.Printf("Error assigning member role to user %s: %v", registration.DiscordID, err)
+
+		var roleID string
+		if registration.RegistrationType == string(RegistrationTypeComplete) {
+			roleID = globalCfg.CompleteRoleID
 		} else {
-			log.Printf("Successfully assigned member role to user %s", registration.DiscordID)
+			roleID = globalCfg.MemberRoleID
+		}
+
+		if roleID != "" {
+			err = dg.GuildMemberRoleAdd(guildID, registration.DiscordID, roleID)
+			if err != nil {
+				log.Printf("Error assigning role to user %s: %v", registration.DiscordID, err)
+			} else {
+				log.Printf("Successfully assigned role to user %s", registration.DiscordID)
+			}
 		}
 	}
 
