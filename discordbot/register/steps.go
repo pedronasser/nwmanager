@@ -57,18 +57,18 @@ func NewStepProcessor() *StepProcessor {
 				Creator: createPVPClassesStep,
 				Handler: handlePVPClassesStep,
 			},
-			{
-				Name:    "Available Times",
-				Type:    StepTypeSelectMenu,
-				Creator: createTimesStep,
-				Handler: handleTimesStep,
-			},
-			{
-				Name:    "Weekdays",
-				Type:    StepTypeSelectMenu,
-				Creator: createWeekdaysStep,
-				Handler: handleWeekdaysStep,
-			},
+			// {
+			// 	Name:    "Available Times",
+			// 	Type:    StepTypeSelectMenu,
+			// 	Creator: createTimesStep,
+			// 	Handler: handleTimesStep,
+			// },
+			// {
+			// 	Name:    "Weekdays",
+			// 	Type:    StepTypeSelectMenu,
+			// 	Creator: createWeekdaysStep,
+			// 	Handler: handleWeekdaysStep,
+			// },
 			{
 				Name:    "War Experience",
 				Type:    StepTypeButton,
@@ -144,4 +144,22 @@ func (sp *StepProcessor) HandleStepResponse(ctx *common.ModuleContext, state *Re
 
 	// Handle the step response
 	return step.Handler(ctx, state, interaction)
+}
+
+// FindStepIndexByHandler finds the step index for a given handler function
+// This allows handlers to be more flexible and not rely on hardcoded indices
+func (sp *StepProcessor) FindStepIndexByHandler(targetHandler StepHandler) int {
+	for i, step := range sp.steps {
+		// Compare function pointers (this is a bit hacky but works for our use case)
+		if fmt.Sprintf("%p", step.Handler) == fmt.Sprintf("%p", targetHandler) {
+			return i
+		}
+	}
+	return -1 // Not found
+}
+
+// IsValidStepForHandler checks if the current step index matches the expected handler
+func (sp *StepProcessor) IsValidStepForHandler(stepIndex int, targetHandler StepHandler) bool {
+	expectedIndex := sp.FindStepIndexByHandler(targetHandler)
+	return expectedIndex != -1 && stepIndex == expectedIndex
 }

@@ -265,8 +265,16 @@ func startRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 
 func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 1 { // PVP Classes is step index 1
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
 		return
 	}
 
@@ -274,7 +282,6 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Classes selecionadas com sucesso!", 1*time.Second)
 
 	// Handle using the new step system
-	processor := GetStepProcessor()
 	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling PVP classes step: %v", err)
@@ -283,8 +290,16 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 
 func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 2 { // Times is step index 2
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
 		return
 	}
 
@@ -292,7 +307,6 @@ func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 	go discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Horários selecionados com sucesso!", 1*time.Second)
 
 	// Handle using the new step system
-	processor := GetStepProcessor()
 	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling times step: %v", err)
@@ -301,8 +315,16 @@ func handleTimeSelection(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 
 func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 3 { // Weekdays is step index 3
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
 		return
 	}
 
@@ -310,7 +332,6 @@ func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionC
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Dias selecionados com sucesso!", 1*time.Second)
 
 	// Handle using the new step system
-	processor := GetStepProcessor()
 	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling weekdays step: %v", err)
@@ -319,13 +340,20 @@ func handleWeekdaySelection(ctx *common.ModuleContext, i *discordgo.InteractionC
 
 func handleWarExperienceYes(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 4 { // War Experience is step index 4
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
 		return
 	}
 
 	// Handle using the new step system
-	processor := GetStepProcessor()
 	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling war experience step: %v", err)
@@ -334,8 +362,16 @@ func handleWarExperienceYes(ctx *common.ModuleContext, i *discordgo.InteractionC
 
 func handleWarExperienceNo(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 4 { // War Experience is step index 4
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
 		return
 	}
 
@@ -343,7 +379,6 @@ func handleWarExperienceNo(ctx *common.ModuleContext, i *discordgo.InteractionCr
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Resposta registrada!", 1*time.Second)
 
 	// Handle using the new step system
-	processor := GetStepProcessor()
 	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
 	if err != nil {
 		log.Printf("Error handling war experience step: %v", err)
@@ -352,8 +387,8 @@ func handleWarExperienceNo(ctx *common.ModuleContext, i *discordgo.InteractionCr
 
 func handleGuildNameModal(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 	state, exists := RegisterData[i.Member.User.ID]
-	if !exists || state.StepIndex != 4 { // War Experience is step index 4
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado ou passo inválido.", 5*time.Second)
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
 		return
 	}
 
@@ -394,8 +429,8 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 		ID:         primitive.NewObjectID(),
 		DiscordID:  state.DiscordID,
 		InGameName: state.IGN,
-		WeekDays:   state.Weekdays,
-		Hours:      state.Times,
+		WeekDays:   state.Weekdays,   // Can be nil/empty if step was skipped
+		Hours:      state.Times,      // Can be nil/empty if step was skipped
 		PVPClasses: state.PVPClasses, // Using weapons field for PVP classes
 		CreatedAt:  time.Now(),
 	}
@@ -435,16 +470,20 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 	}
 
 	var timeNames []string
-	for _, timeKey := range state.Times {
-		if name, exists := TIMES[timeKey]; exists {
-			timeNames = append(timeNames, name)
+	if len(state.Times) > 0 {
+		for _, timeKey := range state.Times {
+			if name, exists := TIMES[timeKey]; exists {
+				timeNames = append(timeNames, name)
+			}
 		}
 	}
 
 	var weekdayNames []string
-	for _, weekdayKey := range state.Weekdays {
-		if name, exists := WEEKDAYS[weekdayKey]; exists {
-			weekdayNames = append(weekdayNames, name)
+	if len(state.Weekdays) > 0 {
+		for _, weekdayKey := range state.Weekdays {
+			if name, exists := WEEKDAYS[weekdayKey]; exists {
+				weekdayNames = append(weekdayNames, name)
+			}
 		}
 	}
 
@@ -472,21 +511,29 @@ func sendCompletionMessage(ctx *common.ModuleContext, state *RegistrationState, 
 				Value:  strings.Join(classNames, ", "),
 				Inline: true,
 			},
-			{
-				Name:   "⏰ Horários",
-				Value:  strings.Join(timeNames, ", "),
-				Inline: false,
-			},
-			{
-				Name:   "📅 Dias da Semana",
-				Value:  strings.Join(weekdayNames, ", "),
-				Inline: false,
-			},
 		},
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "Aguarde a aprovação de um administrador",
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
+	}
+
+	// Only add times field if times were collected
+	if len(timeNames) > 0 {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "⏰ Horários",
+			Value:  strings.Join(timeNames, ", "),
+			Inline: false,
+		})
+	}
+
+	// Only add weekdays field if weekdays were collected
+	if len(weekdayNames) > 0 {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "📅 Dias da Semana",
+			Value:  strings.Join(weekdayNames, ", "),
+			Inline: false,
+		})
 	}
 
 	// Add war experience information
@@ -709,13 +756,25 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 
 	// Create new player record
 	now := helpers.GetCurrentTimeAsUTC()
+
+	// Ensure empty slices are not nil for database consistency
+	availableTimes := registration.Hours
+	if availableTimes == nil {
+		availableTimes = []string{}
+	}
+
+	availableWeekdays := registration.WeekDays
+	if availableWeekdays == nil {
+		availableWeekdays = []string{}
+	}
+
 	player := &types.Player{
 		ID:                primitive.NewObjectID(),
 		DiscordID:         registration.DiscordID,
 		IGN:               registration.InGameName,
 		PVPClasses:        registration.PVPClasses,
-		AvailableTimes:    registration.Hours,
-		AvailableWeekdays: registration.WeekDays,
+		AvailableTimes:    availableTimes,
+		AvailableWeekdays: availableWeekdays,
 		WarClass:          string(registration.PVPClasses[0]), // Assuming first class is the war class
 		RegisteredAt:      &now,
 		Stats:             &types.PlayerStats{},

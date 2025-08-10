@@ -233,7 +233,7 @@ func createWarExperienceStep(ctx *common.ModuleContext, state *RegistrationState
 
 	embed := &discordgo.MessageEmbed{
 		Title:       processor.GetStepTitle(state.StepIndex),
-		Description: "**Você já participou de Guerras no New World? Se sim, em qual guild?**\n\nClique em uma das opções abaixo:",
+		Description: "**Você já participou de Guerras no New World? Se sim, em qual guild você jogou sua última guerra?**\n\nClique em uma das opções abaixo:",
 		Color:       0x0099ff,
 	}
 
@@ -279,9 +279,9 @@ func handleWarExperienceStep(ctx *common.ModuleContext, state *RegistrationState
 							Components: []discordgo.MessageComponent{
 								discordgo.TextInput{
 									CustomID:    "guild_name_input",
-									Label:       "Em qual guild(s) você participou de guerras?",
+									Label:       "Em qual guild você lutou sua última guerra?",
 									Style:       discordgo.TextInputShort,
-									Placeholder: "Digite o nome de uma ou mais guilds",
+									Placeholder: "Digite o nome da guild",
 									Required:    true,
 									MaxLength:   100,
 								},
