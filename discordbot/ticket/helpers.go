@@ -234,6 +234,15 @@ func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, p
 		return fmt.Errorf("failed to send ticket message: %w", err)
 	}
 
+	// Pin the ticket message
+	err = ctx.Session().ChannelMessagePin(channel.ID, message.ID)
+	if err != nil {
+		log.Printf("Error pinning ticket message for player %s: %v", player.IGN, err)
+		// Don't return error as the ticket message was sent successfully
+	} else {
+		log.Printf("Successfully pinned ticket message for player %s in channel %s", player.IGN, channel.ID)
+	}
+
 	// Store ticket in database
 	ticket := &Ticket{
 		DiscordID:     player.DiscordID,
