@@ -18,12 +18,13 @@ const ModuleName = "events"
 type EventsConfig struct {
 	Enabled bool `json:"enabled"`
 
-	ChannelIDs   []string `json:"channel_ids"`
-	RequireAdmin bool     `json:"require_admin"`
-	GuideMessage bool     `json:"guide_message"`
-	ChannelName  string   `json:"channel_name"`
-	InitMessage  string   `json:"init_message"`
-	CreateThread bool     `json:"create_thread"`
+	ChannelIDs     []string `json:"channel_ids"`
+	RequireAdmin   bool     `json:"require_admin"`
+	GuideMessage   bool     `json:"guide_message"`
+	ChannelName    string   `json:"channel_name"`
+	InitMessage    string   `json:"init_message"`
+	CreateThread   bool     `json:"create_thread"`
+	RequiredRoleID string   `json:"required_role_id"`
 
 	EventTypeEmojis    map[types.EventType]string   `json:"event_type_emojis"`
 	EventSlots         map[types.EventType]string   `json:"event_slots"`
@@ -107,6 +108,7 @@ func (s *EventsModule) DefaultConfig() any {
 		GuideMessage:       EVENTS_GUIDE_MESSAGE,
 		ChannelName:        "",
 		InitMessage:        EVENTS_CHANNEL_INIT_MESSAGE,
+		RequiredRoleID:     os.Getenv("EVENTS_REQUIRED_ROLE_ID"),
 		EventTypeEmojis:    EventTypeEmojis,
 		EventSlots:         EventSlots,
 		EventSlotsCount:    EventSlotsCount,

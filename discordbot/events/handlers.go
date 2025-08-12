@@ -209,7 +209,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"msg:join_select_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		eventId := strings.TrimPrefix(i.MessageComponentData().CustomID, "join_select_")
 		selectedValue := i.MessageComponentData().Values[0]
-		
+
 		// Parse the selected value to extract role information
 		// Format: "join_{eventId}_{role}"
 		valueParts := strings.Split(selectedValue, "_")
@@ -227,6 +227,13 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 
 		if event.Status != types.EventStatusOpen {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento não está mais aberto para inscrições.", 5*time.Second)
+			return
+		}
+
+		config := GetModuleConfig(ctx)
+		// Check if user has required role
+		if !hasRequiredRole(ctx, i.Member) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui o cargo <@&"+config.RequiredRoleID+"> para participar deste evento. Fale com algum oficial/organizador para mais informações.", 5*time.Second)
 			return
 		}
 
@@ -274,6 +281,12 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 
 		if event.Status != types.EventStatusOpen {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento não está mais aberto para inscrições.", 5*time.Second)
+			return
+		}
+
+		// Check if user has required role
+		if !hasRequiredRole(ctx, i.Member) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não possui a função necessária para participar deste evento.", 5*time.Second)
 			return
 		}
 
@@ -345,6 +358,18 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 
 		if event.Status != types.EventStatusOpen {
 			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento já foi encerrado.", 5*time.Second)
+			return
+		}
+
+		// Check if the user being approved has the required role
+		member, err := ctx.Session().GuildMember(i.GuildID, userId)
+		if err != nil {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Não foi possível verificar as funções do usuário.", 5*time.Second)
+			return
+		}
+
+		if !hasRequiredRole(ctx, member) {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "O usuário não possui a função necessária para participar deste evento.", 5*time.Second)
 			return
 		}
 
