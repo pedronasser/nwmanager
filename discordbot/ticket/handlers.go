@@ -14,16 +14,17 @@ import (
 )
 
 var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
-	"ticket:send_build":      handleSendBuild,
-	"ticket:send_question":   handleSendQuestion,
-	"ticket:change_class":    handleChangeClass,
-	"ticket:view_build":      handleViewBuild,
-	"ticket:close_thread":    handleCloseThread,
-	"ticket:submit_build":    handleSubmitBuild,
-	"ticket:notify_absence":  handleNotifyAbsence,
-	"modal:absence_form":     handleAbsenceModal,
-	"select:class_selection": handleClassSelection,
-	"/ausencia":              handleNotifyAbsence, // Slash command uses same handler as button
+	"ticket:send_build":        handleSendBuild,
+	"ticket:send_question":     handleSendQuestion,
+	"ticket:change_class":      handleChangeClass,
+	"ticket:view_build":        handleViewBuild,
+	"ticket:close_thread":      handleCloseThread,
+	"ticket:submit_build":      handleSubmitBuild,
+	"ticket:notify_absence":    handleNotifyAbsence,
+	"modal:absence_form":       handleAbsenceModal,
+	"select:class_selection":   handleClassSelection,
+	"/ausencia":                handleNotifyAbsence, // Slash command uses same handler as button
+	"/sync-ticket-permissions": handleSyncTicketPermissions,
 }
 
 func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
@@ -500,6 +501,78 @@ func handleSubmitBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate
 	}
 
 	log.Printf("Thread %s deleted after build submission", i.ChannelID)
+}
+
+func handleSyncTicketPermissions(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user is admin
+	if !discordutils.HasRole(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para usar este comando. Apenas administradores podem sincronizar permissões de tickets.", 10*time.Second)
+		return
+	}
+
+	// Respond immediately to acknowledge the command
+	err := ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "🔄 Iniciando sincronização de permissões dos tickets...",
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
+	if err != nil {
+		log.Printf("Error responding to sync command: %v", err)
+		return
+	}
+
+	// Start the sync process in a goroutine
+	go func() {
+		log.Printf("Admin %s (%s) initiated ticket permission sync", i.Member.User.Username, i.Member.User.ID)
+
+		// Get ticket count first for progress
+		activeTickets, err := getAllActiveTickets(ctx)
+		if err != nil {
+			followupContent := fmt.Sprintf("❌ Erro ao obter tickets: %v", err)
+			ctx.Session().FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+				Content: followupContent,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			})
+			return
+		}
+
+		if len(activeTickets) == 0 {
+			ctx.Session().FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+				Content: "ℹ️ Nenhum ticket ativo encontrado para sincronizar.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			})
+			return
+		}
+
+		// Send progress update
+		ctx.Session().FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Content: fmt.Sprintf("📊 Encontrados %d tickets ativos. Sincronizando...", len(activeTickets)),
+			Flags:   discordgo.MessageFlagsEphemeral,
+		})
+
+		err = syncAllTicketPermissions(ctx)
+
+		var followupContent string
+		if err != nil {
+			log.Printf("Error during permission sync: %v", err)
+			followupContent = fmt.Sprintf("⚠️ Sincronização concluída com alguns erros: %v", err)
+		} else {
+			followupContent = fmt.Sprintf("✅ Sincronização concluída com sucesso! %d tickets processados.", len(activeTickets))
+		}
+
+		// Send final result
+		_, err = ctx.Session().FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Content: followupContent,
+			Flags:   discordgo.MessageFlagsEphemeral,
+		})
+		if err != nil {
+			log.Printf("Error sending follow-up message: %v", err)
+		}
+	}()
 }
 
 // isImageAttachment checks if an attachment is an image

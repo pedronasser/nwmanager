@@ -34,18 +34,17 @@ func (s *TicketModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 
 	if !cfg.Enabled {
 		log.Println("Ticket module is disabled, removing commands...")
-		// Remove slash command when module is disabled
+		// Remove slash commands when module is disabled
 		cmds, err := dg.ApplicationCommands(globalCfg.AppID, globalCfg.GuildID)
 		if err == nil {
 			for _, cmd := range cmds {
-				if cmd.Name == "ausencia" {
+				if cmd.Name == "ausencia" || cmd.Name == "sync-ticket-permissions" {
 					err = dg.ApplicationCommandDelete(globalCfg.AppID, globalCfg.GuildID, cmd.ID)
 					if err != nil {
-						log.Printf("Error deleting /ausencia command: %v", err)
+						log.Printf("Error deleting /%s command: %v", cmd.Name, err)
 					} else {
-						log.Println("Removed /ausencia slash command")
+						log.Printf("Removed /%s slash command", cmd.Name)
 					}
-					break
 				}
 			}
 		}
@@ -67,6 +66,18 @@ func (s *TicketModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 		log.Printf("Failed to create /ausencia command: %v", err)
 	} else {
 		log.Println("Created /ausencia slash command")
+	}
+
+	// Register admin command for syncing ticket permissions
+	_, err = dg.ApplicationCommandCreate(globalCfg.AppID, globalCfg.GuildID, &discordgo.ApplicationCommand{
+		Name:        "sync-ticket-permissions",
+		Description: "Sincronizar permissões de todos os tickets com suas categorias (Admin only)",
+		Type:        discordgo.ChatApplicationCommand,
+	})
+	if err != nil {
+		log.Printf("Failed to create /sync-ticket-permissions command: %v", err)
+	} else {
+		log.Println("Created /sync-ticket-permissions slash command")
 	}
 
 	// Update existing ticket messages with latest components

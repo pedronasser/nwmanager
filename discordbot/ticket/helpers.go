@@ -312,3 +312,138 @@ func updateExistingTicketMessages(ctx *common.ModuleContext) error {
 	log.Printf("Ticket message update completed. Updated: %d, Errors: %d", updatedCount, errorCount)
 	return nil
 }
+
+func syncAllTicketPermissions(ctx *common.ModuleContext) error {
+	log.Println("Syncing permissions for all active tickets with their categories...")
+
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+	ticketConfig := GetModuleConfig(ctx)
+
+	// Get all active tickets
+	activeTickets, err := getAllActiveTickets(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active tickets: %w", err)
+	}
+
+	if len(activeTickets) == 0 {
+		log.Println("No active tickets found to sync")
+		return nil
+	}
+
+	syncedCount := 0
+	errorCount := 0
+	movedCount := 0
+
+	for i, ticket := range activeTickets {
+		log.Printf("Processing ticket %d/%d: %s (player: %s)", i+1, len(activeTickets), ticket.ChannelID, ticket.PlayerIGN)
+		
+		moved, err := syncTicketPermissions(ctx, &ticket, globalConfig, ticketConfig)
+		if err != nil {
+			log.Printf("Error syncing permissions for ticket %s (player: %s): %v", ticket.ChannelID, ticket.PlayerIGN, err)
+			errorCount++
+			continue
+		}
+
+		syncedCount++
+		if moved {
+			movedCount++
+		}
+		log.Printf("Successfully synced permissions for ticket %s (player: %s)", ticket.ChannelID, ticket.PlayerIGN)
+	}
+
+	log.Printf("Permission sync completed. Total: %d, Synced: %d, Moved: %d, Errors: %d", len(activeTickets), syncedCount, movedCount, errorCount)
+	
+	if errorCount > 0 {
+		return fmt.Errorf("completed with %d errors out of %d tickets", errorCount, len(activeTickets))
+	}
+	
+	return nil
+}
+
+func syncTicketPermissions(ctx *common.ModuleContext, ticket *Ticket, globalConfig *globals.GlobalsConfig, ticketConfig *TicketConfig) (bool, error) {
+	// Get current channel information
+	channel, err := ctx.Session().Channel(ticket.ChannelID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get channel information: %w", err)
+	}
+
+	// Get player information to determine the correct category
+	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), ticket.DiscordID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get player information: %w", err)
+	}
+	if player == nil {
+		return false, fmt.Errorf("player not found for discord ID: %s", ticket.DiscordID)
+	}
+
+	// Determine the correct category for this ticket
+	var targetCategoryID string
+	if player.WarClass != "" {
+		// Player has a class defined, check if there's a class-specific category
+		if classCategory, exists := globalConfig.ClassCategoryIDs[player.WarClass]; exists {
+			targetCategoryID = classCategory
+		} else {
+			// Fallback to main ticket category if class category doesn't exist
+			targetCategoryID = ticketConfig.TicketCategoryID
+		}
+	} else {
+		// No class defined, use main ticket category
+		targetCategoryID = ticketConfig.TicketCategoryID
+	}
+
+	// If no target category is configured, skip this ticket
+	if targetCategoryID == "" {
+		log.Printf("No target category configured for ticket %s, skipping permission sync", ticket.ChannelID)
+		return false, nil
+	}
+
+	// Get the target category to copy its permissions
+	category, err := ctx.Session().Channel(targetCategoryID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get category %s: %w", targetCategoryID, err)
+	}
+
+	// Create the permission overwrites based on category permissions
+	permissionOverwrites := make([]*discordgo.PermissionOverwrite, len(category.PermissionOverwrites))
+	copy(permissionOverwrites, category.PermissionOverwrites)
+
+	// Ensure the ticket owner has the proper permissions
+	hasOwnerPermission := false
+	for _, overwrite := range permissionOverwrites {
+		if overwrite.ID == ticket.DiscordID && overwrite.Type == discordgo.PermissionOverwriteTypeMember {
+			// Update existing owner permission
+			overwrite.Allow = discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionReadMessageHistory
+			hasOwnerPermission = true
+			break
+		}
+	}
+
+	// If owner permission doesn't exist, add it
+	if !hasOwnerPermission {
+		permissionOverwrites = append(permissionOverwrites, &discordgo.PermissionOverwrite{
+			ID:    ticket.DiscordID,
+			Type:  discordgo.PermissionOverwriteTypeMember,
+			Allow: discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionReadMessageHistory,
+		})
+	}
+
+	// Update the channel with synced permissions and correct category
+	channelEdit := &discordgo.ChannelEdit{
+		PermissionOverwrites: permissionOverwrites,
+	}
+
+	moved := false
+	// If the channel is not in the correct category, move it
+	if channel.ParentID != targetCategoryID {
+		channelEdit.ParentID = targetCategoryID
+		moved = true
+		log.Printf("Moving ticket %s from category %s to %s", ticket.ChannelID, channel.ParentID, targetCategoryID)
+	}
+
+	_, err = ctx.Session().ChannelEdit(ticket.ChannelID, channelEdit)
+	if err != nil {
+		return false, fmt.Errorf("failed to sync permissions: %w", err)
+	}
+
+	return moved, nil
+}
