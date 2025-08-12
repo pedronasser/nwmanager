@@ -30,7 +30,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create database: %v", err)
 	}
-	fmt.Println(db)
 
 	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
 	if err != nil {

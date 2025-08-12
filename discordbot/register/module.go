@@ -1,7 +1,6 @@
 package register
 
 import (
-	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
@@ -63,7 +62,6 @@ func (s *RegisterModule) Name() string {
 
 func (s *RegisterModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
 	var cfg = config.(*RegisterConfig)
-	fmt.Println(cfg)
 	if !cfg.Enabled {
 		return false, nil
 	}

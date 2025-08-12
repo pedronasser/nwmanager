@@ -1,10 +1,9 @@
 package types
 
 import (
-	"fmt"
+	"nwmanager/helpers"
 	"strings"
 	"time"
-	"nwmanager/helpers"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -50,8 +49,6 @@ func ParseLastActive(lastActive string) time.Time {
 	if err != nil {
 		t = 0
 	}
-
-	fmt.Println(t)
 
 	return time.Now().Add(-t)
 }

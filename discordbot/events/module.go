@@ -1,7 +1,6 @@
 package events
 
 import (
-	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
@@ -45,8 +44,6 @@ func (s *EventsModule) Name() string {
 func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
 
 	var cfg = config.(*EventsConfig)
-
-	fmt.Println(cfg)
 	if !cfg.Enabled {
 		return false, nil
 	}
