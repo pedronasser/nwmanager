@@ -30,6 +30,25 @@ var EventSlotsCount = map[types.EventType]int{
 	types.EventTypeArena:         3,
 }
 
+const (
+	EventSlotTank         EventSlotRole = 'T'
+	EventSlotDPS          EventSlotRole = 'D'
+	EventSlotAny          EventSlotRole = 'A'
+	EventSlotHeal         EventSlotRole = 'H'
+	EventSlotRangedTank   EventSlotRole = '0' // Ranged Tank
+	EventSlotDPSBlood     EventSlotRole = '1' // Rapier Blood
+	EventSlotDPSEvade     EventSlotRole = '2' // Rapier Evade
+	EventSlotDPSSpear     EventSlotRole = '3' // Lança
+	EventSlotDPSSerenity  EventSlotRole = '4' // Serenidade
+	EventSlotDPSFire      EventSlotRole = '5' // Fire DPS
+	EventSlotDPSRendBot   EventSlotRole = 'R' // Rend Bot
+	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
+	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
+	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
+	EventSlotHealFlail    EventSlotRole = 'L' // Heal/Flail
+	EventSlotDPSEvadeFire EventSlotRole = 'E' // Evade Fire
+)
+
 // Event slots
 var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonNormal: "THDDD",
@@ -37,7 +56,7 @@ var EventSlots = map[types.EventType]string{
 	types.EventTypeDungeonM2:     "THDDD",
 	types.EventTypeDungeonM3:     "THDDD",
 	types.EventTypeRaidGorgon:    "TL223 S1H22",
-	types.EventTypeRaidDevour:    "R5HFS 1222E 12223 RPPPP",
+	types.EventTypeRaidDevour:    "05HFS 1222E 12223 RPPPP",
 	types.EventTypeOPR:           "THDDD",
 	types.EventTypeArena:         "",
 	types.EventTypeInfluenceRace: "",
@@ -48,13 +67,13 @@ var EventSlotRoleName = map[EventSlotRole]string{
 	EventSlotTank:         "Tank",
 	EventSlotDPS:          "DPS",
 	EventSlotHeal:         "Heal",
-	EventSlotRangedTank:   "R. Tank",
+	EventSlotRangedTank:   "Ranged Tank",
 	EventSlotDPSBlood:     "R. Blood",
 	EventSlotDPSEvade:     "R. Evade",
 	EventSlotDPSSpear:     "Lança",
 	EventSlotDPSFire:      "Fire DPS",
 	EventSlotDPSSerenity:  "Serenity",
-	EventSlotDPSRendBot:   "Rend Bot",
+	EventSlotDPSRendBot:   "SnS Rend",
 	EventSlotDPSSnS:       "SnS DPS",
 	EventSlotDPSPadLight:  "Pad Light",
 	EventSlotSupportFlail: "Flail",

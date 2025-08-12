@@ -17,25 +17,6 @@ const (
 )
 
 const (
-	EventSlotTank         EventSlotRole = 'T'
-	EventSlotDPS          EventSlotRole = 'D'
-	EventSlotAny          EventSlotRole = 'A'
-	EventSlotHeal         EventSlotRole = 'H'
-	EventSlotRangedTank   EventSlotRole = '0' // Ranged Tank
-	EventSlotDPSBlood     EventSlotRole = '1' // Rapier Blood
-	EventSlotDPSEvade     EventSlotRole = '2' // Rapier Evade
-	EventSlotDPSSpear     EventSlotRole = '3' // Lança
-	EventSlotDPSSerenity  EventSlotRole = '4' // Serenidade
-	EventSlotDPSFire      EventSlotRole = '5' // Fire DPS
-	EventSlotDPSRendBot   EventSlotRole = 'R' // Rend Bot
-	EventSlotDPSSnS       EventSlotRole = 'S' // SnS DPS
-	EventSlotDPSPadLight  EventSlotRole = 'P' // Arco Pad
-	EventSlotSupportFlail EventSlotRole = 'F' // Flail/Suporte
-	EventSlotHealFlail    EventSlotRole = 'L' // Heal/Flail
-	EventSlotDPSEvadeFire EventSlotRole = 'E' // Evade Fire
-)
-
-const (
 	EventTypeEmojiDungeonNormal = "🧌"
 	EventTypeEmojiDungeonM1     = "1️⃣"
 	EventTypeEmojiDungeonM2     = "2️⃣"
