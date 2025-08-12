@@ -206,6 +206,56 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 		ctx.Session().InteractionResponseDelete(i.Interaction)
 	},
 
+	"msg:join_select_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+		eventId := strings.TrimPrefix(i.MessageComponentData().CustomID, "join_select_")
+		selectedValue := i.MessageComponentData().Values[0]
+		
+		// Parse the selected value to extract role information
+		// Format: "join_{eventId}_{role}"
+		valueParts := strings.Split(selectedValue, "_")
+		if len(valueParts) != 3 || valueParts[0] != "join" {
+			return
+		}
+
+		classRune := valueParts[2]
+		role := EventSlotRole(classRune[0])
+
+		event, err := types.GetEventByID(ctx, eventId)
+		if err != nil {
+			return
+		}
+
+		if event.Status != types.EventStatusOpen {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Este evento não está mais aberto para inscrições.", 5*time.Second)
+			return
+		}
+
+		if event.IsInviteOnly && event.Owner != i.Member.User.ID {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Um pedido de entrada foi feito ao organizador deste evento.\nAguarde a aprovação.", 5*time.Second)
+			sendJoinRequest(ctx, event, i.Member.User, role)
+			return
+		}
+
+		if isUserAlreadyInEvent(event, i.Member.User.ID) {
+			err = updateEventPlayerRole(ctx, i.Member.User, event, role)
+		} else {
+			err = addPlayerToEvent(ctx, i.Member.User.ID, event, role)
+		}
+		if err != nil {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, err.Error(), 5*time.Second)
+			return
+		}
+
+		err = updateEventMessage(ctx, event)
+		if err != nil {
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Ocorreu um erro ao atualizar o evento.", 5*time.Second)
+			log.Printf("Cannot update event message: %v", err)
+			return
+		}
+
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você foi inscrito no evento.", 5*time.Second)
+	},
+
 	"msg:join_": func(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 		id := strings.TrimPrefix(i.MessageComponentData().CustomID, "join_")
 		parts := strings.Split(id, "_")

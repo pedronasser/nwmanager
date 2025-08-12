@@ -73,7 +73,7 @@ func buildEventMessage(config *EventsConfig, event *types.Event) *discordgo.Mess
 
 		if EventSlots[event.Type] != "" {
 			role := getEventRoleNameByPosition(config, event.Type, i)
-			playerName := "_[ABERTO]_"
+			playerName := "_[ABERTA]_"
 			if player != "" {
 				playerName = fmt.Sprintf("<@%s>", player)
 			}
@@ -266,67 +266,67 @@ func createEventMessage(ctx *common.ModuleContext, events_channel *discordgo.Cha
 	config := GetModuleConfig(ctx)
 	components := []discordgo.MessageComponent{}
 
-	joinActionsRow := discordgo.ActionsRow{
-		Components: []discordgo.MessageComponent{},
-	}
+	// Create select menu for joining with different roles
+	joinOptions := []discordgo.SelectMenuOption{}
 
-	btnLength := 0
-
+	// Add role-based options if the event has specific slot types
 	for _, slot := range getEventSlotTypes(config, event) {
-		if btnLength == 4 {
-			components = append(components, joinActionsRow)
-			joinActionsRow = discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{},
-			}
-			btnLength = 0
-		}
-		joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
-			Label:    fmt.Sprintf("Entrar %s", EventSlotRoleName[slot]),
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("join_%s_%s", event.ID.Hex(), string(slot)),
-			Emoji:    &discordgo.ComponentEmoji{Name: EventSlotRoleEmoji[slot]},
+		joinOptions = append(joinOptions, discordgo.SelectMenuOption{
+			Label: fmt.Sprintf("Entrar como %s", EventSlotRoleName[slot]),
+			Value: fmt.Sprintf("join_%s_%s", event.ID.Hex(), string(slot)),
+			Emoji: &discordgo.ComponentEmoji{Name: EventSlotRoleEmoji[slot]},
 		})
-		btnLength++
 	}
 
+	// Add generic join option if no specific slots are defined
 	if EventSlots[event.Type] == "" {
-		joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
-			Label:    "Entrar",
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("join_%s_A", event.ID.Hex()),
-			Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
+		joinOptions = append(joinOptions, discordgo.SelectMenuOption{
+			Label: "Entrar",
+			Value: fmt.Sprintf("join_%s_A", event.ID.Hex()),
+			Emoji: &discordgo.ComponentEmoji{Name: "🎮"},
 		})
 	}
 
-	joinActionsRow.Components = append(joinActionsRow.Components, discordgo.Button{
-		Label:    "Sair",
-		Style:    discordgo.SecondaryButton,
-		CustomID: fmt.Sprintf("leave_%s", event.ID.Hex()),
-		Emoji:    &discordgo.ComponentEmoji{Name: "❌"},
-	})
-
-	components = append(components, joinActionsRow)
-	components = append(components,
-		discordgo.ActionsRow{
+	// Only add select menu if there are join options
+	if len(joinOptions) > 0 {
+		selectMenuRow := discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label:    "Editar",
-					Style:    discordgo.PrimaryButton,
-					CustomID: fmt.Sprintf("edit_%s", event.ID.Hex()),
-				},
-				// discordgo.Button{
-				// 	Label:    "Remover Participante",
-				// 	Style:    discordgo.SecondaryButton,
-				// 	CustomID: fmt.Sprintf("uninvite_%s", event.ID.Hex()),
-				// },
-				discordgo.Button{
-					Label:    "Encerrar",
-					Style:    discordgo.DangerButton,
-					CustomID: fmt.Sprintf("close_event_%s", event.ID.Hex()),
+				discordgo.SelectMenu{
+					CustomID:    fmt.Sprintf("join_select_%s", event.ID.Hex()),
+					MenuType:    discordgo.StringSelectMenu,
+					Placeholder: "Escolha sua função e entre no evento",
+					MinValues:   Some(1),
+					MaxValues:   *Some(1),
+					Options:     joinOptions,
 				},
 			},
+		}
+		components = append(components, selectMenuRow)
+	}
+
+	// Action buttons row (Sair, Editar, Encerrar)
+	actionsRow := discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{
+				Label:    "Sair",
+				Style:    discordgo.SecondaryButton,
+				CustomID: fmt.Sprintf("leave_%s", event.ID.Hex()),
+				Emoji:    &discordgo.ComponentEmoji{Name: "❌"},
+			},
+			discordgo.Button{
+				Label:    "Editar",
+				Style:    discordgo.PrimaryButton,
+				CustomID: fmt.Sprintf("edit_%s", event.ID.Hex()),
+			},
+			discordgo.Button{
+				Label:    "Encerrar",
+				Style:    discordgo.DangerButton,
+				CustomID: fmt.Sprintf("close_event_%s", event.ID.Hex()),
+			},
 		},
-	)
+	}
+
+	components = append(components, actionsRow)
 
 	eventMessage := buildEventMessage(config, event)
 	message, err := ctx.Session().ChannelMessageSendComplex(events_channel.ID,
