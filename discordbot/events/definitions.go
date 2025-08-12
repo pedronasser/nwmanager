@@ -109,56 +109,56 @@ var EventTypeNames = map[types.EventType]string{
 
 var (
 	EVENT_TYPE_OPTIONS = []common.EventSelectorOption{
-		{
-			Label: EventNameLootRoute,
-			Value: string(types.EventTypeLootRoute),
-			Emoji: EventTypeEmojiLootRoute,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidGorgon, EventSlotsCount[types.EventTypeRaidGorgon]),
-			Value: string(types.EventTypeRaidGorgon),
-			Emoji: EventTypeEmojiRaidGorgon,
-		},
+		// {
+		// 	Label: EventNameLootRoute,
+		// 	Value: string(types.EventTypeLootRoute),
+		// 	Emoji: EventTypeEmojiLootRoute,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidGorgon, EventSlotsCount[types.EventTypeRaidGorgon]),
+		// 	Value: string(types.EventTypeRaidGorgon),
+		// 	Emoji: EventTypeEmojiRaidGorgon,
+		// },
 		{
 			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameRaidDevour, EventSlotsCount[types.EventTypeRaidDevour]),
 			Value: string(types.EventTypeRaidDevour),
 			Emoji: EventTypeEmojiRaidDevour,
 		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameOPR, EventSlotsCount[types.EventTypeOPR]),
-			Value: string(types.EventTypeOPR),
-			Emoji: EventTypeEmojiOPR,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameArena, EventSlotsCount[types.EventTypeArena]),
-			Value: string(types.EventTypeArena),
-			Emoji: EventTypeEmojiArena,
-		},
-		{
-			Label: fmt.Sprintf("%s", EventNameInfluenceRace),
-			Value: string(types.EventTypeInfluenceRace),
-			Emoji: EventTypeEmojiInfluenceRace,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonNormal, EventSlotsCount[types.EventTypeDungeonNormal]),
-			Value: string(types.EventTypeDungeonNormal),
-			Emoji: EventTypeEmojiDungeonNormal,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM1, EventSlotsCount[types.EventTypeDungeonM1]),
-			Value: string(types.EventTypeDungeonM1),
-			Emoji: EventTypeEmojiDungeonM1,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM2, EventSlotsCount[types.EventTypeDungeonM2]),
-			Value: string(types.EventTypeDungeonM2),
-			Emoji: EventTypeEmojiDungeonM2,
-		},
-		{
-			Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM3, EventSlotsCount[types.EventTypeDungeonM3]),
-			Value: string(types.EventTypeDungeonM3),
-			Emoji: EventTypeEmojiDungeonM3,
-		},
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameOPR, EventSlotsCount[types.EventTypeOPR]),
+		// 	Value: string(types.EventTypeOPR),
+		// 	Emoji: EventTypeEmojiOPR,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameArena, EventSlotsCount[types.EventTypeArena]),
+		// 	Value: string(types.EventTypeArena),
+		// 	Emoji: EventTypeEmojiArena,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s", EventNameInfluenceRace),
+		// 	Value: string(types.EventTypeInfluenceRace),
+		// 	Emoji: EventTypeEmojiInfluenceRace,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonNormal, EventSlotsCount[types.EventTypeDungeonNormal]),
+		// 	Value: string(types.EventTypeDungeonNormal),
+		// 	Emoji: EventTypeEmojiDungeonNormal,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM1, EventSlotsCount[types.EventTypeDungeonM1]),
+		// 	Value: string(types.EventTypeDungeonM1),
+		// 	Emoji: EventTypeEmojiDungeonM1,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM2, EventSlotsCount[types.EventTypeDungeonM2]),
+		// 	Value: string(types.EventTypeDungeonM2),
+		// 	Emoji: EventTypeEmojiDungeonM2,
+		// },
+		// {
+		// 	Label: fmt.Sprintf("%s [Vagas: %d]", EventNameDungeonM3, EventSlotsCount[types.EventTypeDungeonM3]),
+		// 	Value: string(types.EventTypeDungeonM3),
+		// 	Emoji: EventTypeEmojiDungeonM3,
+		// },
 	}
 )
 

@@ -623,43 +623,13 @@ func handleEventEdit(ctx *common.ModuleContext, i *discordgo.InteractionCreate, 
 
 func setupEventsChannel(
 	ctx *common.ModuleContext,
+	setupWelcomeMessage bool,
 	channel_id string,
 ) (*discordgo.Channel, error) {
 	events_channel, err := ctx.Session().Channel(channel_id)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get events channel: %v", err)
 	}
-
-	// if EVENTS_GUIDE_MESSAGE {
-	// 	_, err = dg.ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
-	// 		Embed: &discordgo.MessageEmbed{
-	// 			Title:       "Eventos Ativos",
-	// 			Description: EVENTS_CHANNEL_INIT_MESSAGE,
-	// 			Color:       0xcccccc,
-	// 		},
-	// 		Components: []discordgo.MessageComponent{
-	// 			&discordgo.ActionsRow{
-	// 				Components: []discordgo.MessageComponent{
-	// 					&discordgo.Button{
-	// 						Label:    "Novo Evento",
-	// 						Style:    discordgo.PrimaryButton,
-	// 						Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
-	// 						CustomID: "create_event",
-	// 					},
-	// 					&discordgo.Button{
-	// 						Label:    "Novo Evento Fechado",
-	// 						Style:    discordgo.SecondaryButton,
-	// 						Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
-	// 						CustomID: "create_closed_event",
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 	})
-	// 	if err != nil {
-	// 		log.Fatalf("Cannot send setup message: %v", err)
-	// 	}
-	// }
 
 	channel_msgs, err := ctx.Session().ChannelMessages(events_channel.ID, 100, "", "", "")
 	if err != nil {
@@ -713,6 +683,37 @@ func setupEventsChannel(
 
 		fmt.Println("Deleting message:", msg.ID, "from channel:", events_channel.ID)
 		ctx.Session().ChannelMessageDelete(events_channel.ID, msg.ID)
+	}
+
+	if setupWelcomeMessage {
+		_, err = ctx.Session().ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
+			Embed: &discordgo.MessageEmbed{
+				Title:       "Eventos Ativos",
+				Description: EVENTS_CHANNEL_INIT_MESSAGE,
+				Color:       0xcccccc,
+			},
+			Components: []discordgo.MessageComponent{
+				&discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						&discordgo.Button{
+							Label:    "Novo Evento",
+							Style:    discordgo.PrimaryButton,
+							Emoji:    &discordgo.ComponentEmoji{Name: "🎮"},
+							CustomID: "create_event",
+						},
+						// &discordgo.Button{
+						// 	Label:    "Novo Evento Fechado",
+						// 	Style:    discordgo.SecondaryButton,
+						// 	Emoji:    &discordgo.ComponentEmoji{Name: "🔒"},
+						// 	CustomID: "create_closed_event",
+						// },
+					},
+				},
+			},
+		})
+		if err != nil {
+			log.Fatalf("Cannot send setup message: %v", err)
+		}
 	}
 
 	return events_channel, nil

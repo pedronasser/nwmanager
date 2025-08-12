@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/discordutils"
@@ -42,7 +43,10 @@ func (s *EventsModule) Name() string {
 }
 
 func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
+
 	var cfg = config.(*EventsConfig)
+
+	fmt.Println(cfg)
 	if !cfg.Enabled {
 		return false, nil
 	}
@@ -53,7 +57,7 @@ func (s *EventsModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	dg := ctx.Session()
 
 	for _, channel_id := range cfg.ChannelIDs {
-		_, err := setupEventsChannel(ctx, channel_id)
+		_, err := setupEventsChannel(ctx, cfg.GuideMessage, channel_id)
 		if err != nil {
 			log.Printf("Cannot setup events channel %s: %v", channel_id, err)
 			continue
