@@ -644,6 +644,7 @@ func setupEventsChannel(
 		return nil, fmt.Errorf("Cannot query events: %v", err)
 	}
 
+	msgIDs := []string{}
 	// Only send welcome message if setupWelcomeMessage is true and channel was originally empty
 	if setupWelcomeMessage && len(channel_msgs) == 0 {
 		_, err = ctx.Session().ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
@@ -674,6 +675,10 @@ func setupEventsChannel(
 		if err != nil {
 			log.Fatalf("Cannot send setup message: %v", err)
 		}
+
+		msgIDs = append(msgIDs, events_channel.ID)
+	} else {
+		msgIDs = append(msgIDs, channel_msgs[0].ID)
 	}
 
 	var events []types.Event
@@ -681,7 +686,6 @@ func setupEventsChannel(
 		return nil, fmt.Errorf("Cannot decode events: %v", err)
 	}
 
-	msgIDs := []string{}
 	for _, event := range events {
 		if event.MessageID != "" {
 			msgIDs = append(msgIDs, event.MessageID)
