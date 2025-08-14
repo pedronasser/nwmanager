@@ -720,9 +720,22 @@ func setupEventsChannel(
 	}
 
 	msgIDs := []string{}
-	// Only send welcome message if setupWelcomeMessage is true and channel was originally empty
-	if setupWelcomeMessage && len(channel_msgs) == 0 {
-		_, err = ctx.Session().ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
+	
+	// Look for existing welcome message in channel
+	var existingWelcomeMsg *discordgo.Message
+	for _, msg := range channel_msgs {
+		if len(msg.Embeds) > 0 && msg.Embeds[0].Title == "Eventos Ativos" {
+			existingWelcomeMsg = msg
+			break
+		}
+	}
+	
+	// If we found an existing welcome message, preserve it
+	if existingWelcomeMsg != nil {
+		msgIDs = append(msgIDs, existingWelcomeMsg.ID)
+	} else if setupWelcomeMessage {
+		// Only send welcome message if setupWelcomeMessage is true and no existing welcome message found
+		welcomeMsg, err := ctx.Session().ChannelMessageSendComplex(events_channel.ID, &discordgo.MessageSend{
 			Embed: &discordgo.MessageEmbed{
 				Title:       "Eventos Ativos",
 				Description: EVENTS_CHANNEL_INIT_MESSAGE,
@@ -751,9 +764,7 @@ func setupEventsChannel(
 			log.Fatalf("Cannot send setup message: %v", err)
 		}
 
-		msgIDs = append(msgIDs, events_channel.ID)
-	} else {
-		msgIDs = append(msgIDs, channel_msgs[0].ID)
+		msgIDs = append(msgIDs, welcomeMsg.ID)
 	}
 
 	var events []types.Event

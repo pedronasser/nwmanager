@@ -475,18 +475,18 @@ func canCreateEvent(ctx *common.ModuleContext, member *discordgo.Member) bool {
 
 func hasRequiredRole(ctx *common.ModuleContext, member *discordgo.Member) bool {
 	config := GetModuleConfig(ctx)
-	
+
 	// If no required role is set, allow everyone
 	if config.RequiredRoleID == "" {
 		return true
 	}
-	
+
 	// Check if member has the required role
 	for _, roleID := range member.Roles {
 		if roleID == config.RequiredRoleID {
 			return true
 		}
 	}
-	
+
 	return false
 }
