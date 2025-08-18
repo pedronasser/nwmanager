@@ -9,6 +9,7 @@ import (
 	"nwmanager/discordbot/globals"
 	"nwmanager/types"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -18,6 +19,7 @@ func memberRoleMonitoringRoutine(ctx *common.ModuleContext) {
 	config := GetModuleConfig(ctx)
 	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
 
+	performPeriodicMemberCheck(ctx, globalConfig)
 	routineExportPlayersCSV(ctx, ctx.DB())
 
 	ticker := time.NewTicker(time.Duration(config.CheckInterval) * time.Second)
@@ -26,34 +28,36 @@ func memberRoleMonitoringRoutine(ctx *common.ModuleContext) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Println("Checking member roles for ticket management...")
-
-			// Get all guild members
-			members, err := ctx.Session().GuildMembers(globalConfig.GuildID, "", 1000)
-			if err != nil {
-				log.Printf("Error fetching guild members: %v", err)
-				continue
-			}
-
-			// Get all active tickets
-			activeTickets, err := getAllActiveTickets(ctx)
-			if err != nil {
-				log.Printf("Error fetching active tickets: %v", err)
-				continue
-			}
-
-			// Check each member's role status
-			for _, member := range members {
-				err := processMemberRoleStatus(ctx, member, activeTickets, globalConfig.MemberRoleID)
-				if err != nil {
-					log.Printf("Error processing member %s: %v", member.User.ID, err)
-				}
-			}
-
 			routineExportPlayersCSV(ctx, ctx.DB())
 
 		case <-ctx.Context.Done():
 			return
+		}
+	}
+}
+
+func performPeriodicMemberCheck(ctx *common.ModuleContext, globalConfig *globals.GlobalsConfig) {
+	log.Println("Running periodic member role check (backup routine)...")
+
+	// Get all guild members
+	members, err := ctx.Session().GuildMembers(globalConfig.GuildID, "", 1000)
+	if err != nil {
+		log.Printf("Error fetching guild members: %v", err)
+		return
+	}
+
+	// Get all active tickets
+	activeTickets, err := getAllActiveTickets(ctx)
+	if err != nil {
+		log.Printf("Error fetching active tickets: %v", err)
+		return
+	}
+
+	// Check each member's role status
+	for _, member := range members {
+		err := processMemberRoleStatus(ctx, member, activeTickets, globalConfig.MemberRoleID)
+		if err != nil {
+			log.Printf("Error processing member %s: %v", member.User.ID, err)
 		}
 	}
 }
@@ -232,4 +236,83 @@ func routineExportPlayersCSV(ctx *common.ModuleContext, db database.Database) {
 	os.Rename("players_new.csv", "static/players.csv")
 
 	log.Println("Exported players to players.csv")
+}
+
+// HandleGuildMemberUpdate handles real-time member role updates
+func HandleGuildMemberUpdate(ctx *common.ModuleContext) func(s *discordgo.Session, m *discordgo.GuildMemberUpdate) {
+	return func(s *discordgo.Session, m *discordgo.GuildMemberUpdate) {
+		globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+		// Only process events for our guild
+		if m.GuildID != globalConfig.GuildID {
+			return
+		}
+
+		// Get the old member state to compare roles
+		if m.BeforeUpdate == nil {
+			// If we don't have before state, we can't compare roles
+			// Fall back to current polling system
+			return
+		}
+
+		memberRoleID := globalConfig.MemberRoleID
+
+		// Check if member role status changed
+		oldHasMemberRole := slices.Contains(m.BeforeUpdate.Roles, memberRoleID)
+		newHasMemberRole := slices.Contains(m.Member.Roles, memberRoleID)
+
+		// Only process if member role status actually changed
+		if oldHasMemberRole == newHasMemberRole {
+			return
+		}
+
+		log.Printf("Member %s (%s) role change detected: had member role: %v -> has member role: %v",
+			m.Member.User.Username, m.Member.User.ID, oldHasMemberRole, newHasMemberRole)
+
+		// Get all active tickets to pass to processing function
+		activeTickets, err := getAllActiveTickets(ctx)
+		if err != nil {
+			log.Printf("Error fetching active tickets for member update: %v", err)
+			return
+		}
+
+		// Process the member role status change
+		err = processMemberRoleStatus(ctx, m.Member, activeTickets, memberRoleID)
+		if err != nil {
+			log.Printf("Error processing member role change for %s: %v", m.Member.User.ID, err)
+		}
+	}
+}
+
+// HandleGuildMemberRemove handles when members leave the guild entirely
+func HandleGuildMemberRemove(ctx *common.ModuleContext) func(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
+	return func(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
+		globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+		// Only process events for our guild
+		if m.GuildID != globalConfig.GuildID {
+			return
+		}
+
+		log.Printf("Member %s (%s) left the guild, checking for active ticket",
+			m.Member.User.Username, m.Member.User.ID)
+
+		// Check if this member has an active ticket
+		ticket, err := getTicketByDiscordID(ctx, m.Member.User.ID)
+		if err != nil {
+			log.Printf("Error checking for ticket when member left: %v", err)
+			return
+		}
+
+		// If they have an active ticket, remove it
+		if ticket != nil {
+			err := removeTicketForMember(ctx, ticket)
+			if err != nil {
+				log.Printf("Error removing ticket for departed member %s: %v", m.Member.User.ID, err)
+			} else {
+				log.Printf("Successfully removed ticket for departed member %s (%s)",
+					m.Member.User.Username, m.Member.User.ID)
+			}
+		}
+	}
 }

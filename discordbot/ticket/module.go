@@ -56,6 +56,10 @@ func (s *TicketModule) Setup(ctx *common.ModuleContext, config any) (bool, error
 	// Add interaction handlers
 	dg.AddHandler(HandleTicketAction(ctx, globalCfg.GuildID))
 
+	// Add Discord event handlers for real-time member monitoring
+	dg.AddHandler(HandleGuildMemberUpdate(ctx))
+	dg.AddHandler(HandleGuildMemberRemove(ctx))
+
 	// Register slash command for absence notification
 	_, err := dg.ApplicationCommandCreate(globalCfg.AppID, globalCfg.GuildID, &discordgo.ApplicationCommand{
 		Name:        "ausencia",
@@ -103,7 +107,7 @@ func (s *TicketModule) DefaultConfig() any {
 		Enabled:          IsModuleEnabledFromEnv,
 		TicketCategoryID: os.Getenv("TICKET_CATEGORY_ID"),
 		AbsenceChannelID: os.Getenv("ABSENCE_CHANNEL_ID"),
-		CheckInterval:    300, // 5 minutes default
+		CheckInterval:    1800, // 30 minutes (since real-time events handle most cases)
 	}
 }
 
