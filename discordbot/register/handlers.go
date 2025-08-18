@@ -842,6 +842,11 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		Stats:             &types.PlayerStats{},
 	}
 
+	err = types.ApproveRegister(context.Background(), ctx.DB(), registrationID, approverID)
+	if err != nil {
+		return fmt.Errorf("error approving registration: %v", err)
+	}
+
 	// If player exists, delete the old record first
 	if existingPlayer != nil {
 		log.Printf("Existing player found for Discord ID %s, removing old record", registration.DiscordID)
@@ -892,7 +897,7 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 	}
 
 	// Mark registration as approved
-	return types.ApproveRegister(context.Background(), ctx.DB(), registrationID, approverID)
+	return nil
 }
 
 func processRejection(ctx *common.ModuleContext, registrationID, rejecterID string) error {
