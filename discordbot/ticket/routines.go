@@ -36,11 +36,38 @@ func memberRoleMonitoringRoutine(ctx *common.ModuleContext) {
 	}
 }
 
+// getAllGuildMembers fetches all members from a guild using pagination
+func getAllGuildMembers(ctx *common.ModuleContext, guildID string) ([]*discordgo.Member, error) {
+	var allMembers []*discordgo.Member
+	const limit = 1000 // Discord API limit per request
+	after := ""
+
+	for {
+		members, err := ctx.Session().GuildMembers(guildID, after, limit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch guild members: %w", err)
+		}
+
+		allMembers = append(allMembers, members...)
+
+		// If we got fewer members than the limit, we've reached the end
+		if len(members) < limit {
+			break
+		}
+
+		// Set the cursor for the next page to the ID of the last member
+		after = members[len(members)-1].User.ID
+	}
+
+	log.Printf("Successfully fetched %d total guild members", len(allMembers))
+	return allMembers, nil
+}
+
 func performPeriodicMemberCheck(ctx *common.ModuleContext, globalConfig *globals.GlobalsConfig) {
 	log.Println("Running periodic member role check (backup routine)...")
 
-	// Get all guild members
-	members, err := ctx.Session().GuildMembers(globalConfig.GuildID, "", 1000)
+	// Get all guild members with pagination
+	members, err := getAllGuildMembers(ctx, globalConfig.GuildID)
 	if err != nil {
 		log.Printf("Error fetching guild members: %v", err)
 		return
@@ -53,11 +80,39 @@ func performPeriodicMemberCheck(ctx *common.ModuleContext, globalConfig *globals
 		return
 	}
 
+	// Create a map of current member IDs for fast lookup
+	memberIDs := make(map[string]bool)
+	for _, member := range members {
+		memberIDs[member.User.ID] = true
+	}
+
 	// Check each member's role status
 	for _, member := range members {
 		err := processMemberRoleStatus(ctx, member, activeTickets, globalConfig.MemberRoleID)
 		if err != nil {
 			log.Printf("Error processing member %s: %v", member.User.ID, err)
+		}
+	}
+
+	// Cleanup: Remove tickets for members who are no longer in the guild
+	for _, ticket := range activeTickets {
+		if !memberIDs[ticket.DiscordID] {
+			// Double-check by attempting to retrieve the member directly from Discord API
+			// This ensures we don't have false positives due to pagination limits
+			_, err := ctx.Session().GuildMember(globalConfig.GuildID, ticket.DiscordID)
+			if err != nil {
+				// Member not found in guild, remove the ticket
+				log.Printf("Confirmed orphaned ticket for user %s who is no longer in the guild: %v", ticket.DiscordID, err)
+				err := removeTicketForMember(ctx, &ticket)
+				if err != nil {
+					log.Printf("Error removing orphaned ticket for user %s: %v", ticket.DiscordID, err)
+				} else {
+					log.Printf("Successfully removed orphaned ticket for departed user %s", ticket.DiscordID)
+				}
+			} else {
+				// Member exists but wasn't in our members list (probably due to pagination)
+				log.Printf("Ticket owner %s exists in guild but wasn't in member list (pagination limit)", ticket.DiscordID)
+			}
 		}
 	}
 }
