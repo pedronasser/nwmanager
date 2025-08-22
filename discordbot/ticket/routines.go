@@ -129,23 +129,32 @@ func processMemberRoleStatus(ctx *common.ModuleContext, member *discordgo.Member
 		}
 	}
 
+	log.Printf("Processing member %s (%s): hasMemberRole=%v, hasExistingTicket=%v",
+		member.User.Username, member.User.ID, hasMemberRole, existingTicket != nil)
+
 	if hasMemberRole {
 		// Member has role but no ticket - create one
 		if existingTicket == nil {
+			log.Printf("Creating ticket for member %s who has role but no ticket", member.User.ID)
 			err := createTicketForMember(ctx, member)
 			if err != nil {
 				return fmt.Errorf("failed to create ticket for member %s: %w", member.User.ID, err)
 			}
 			log.Printf("Created ticket for member %s (%s)", member.User.Username, member.User.ID)
+		} else {
+			log.Printf("Member %s already has ticket, no action needed", member.User.ID)
 		}
 	} else {
 		// Member doesn't have role but has ticket - delete it
 		if existingTicket != nil {
+			log.Printf("Removing ticket for member %s who no longer has role", member.User.ID)
 			err := removeTicketForMember(ctx, existingTicket)
 			if err != nil {
 				return fmt.Errorf("failed to remove ticket for member %s: %w", member.User.ID, err)
 			}
 			log.Printf("Removed ticket for member %s (%s)", member.User.Username, member.User.ID)
+		} else {
+			log.Printf("Member %s has no role and no ticket, no action needed", member.User.ID)
 		}
 	}
 
@@ -153,13 +162,29 @@ func processMemberRoleStatus(ctx *common.ModuleContext, member *discordgo.Member
 }
 
 func createTicketForMember(ctx *common.ModuleContext, member *discordgo.Member) error {
-	// Get player data
-	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), member.User.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get player data: %w", err)
-	}
-	if player == nil {
-		return fmt.Errorf("no player data found for member %s", member.User.ID)
+	// Get player data with retry logic in case of timing issues
+	var player *types.Player
+	var err error
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		player, err = types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), member.User.ID)
+		if err != nil {
+			if i == maxRetries-1 {
+				return fmt.Errorf("failed to get player data after %d retries: %w", maxRetries, err)
+			}
+			log.Printf("Attempt %d failed to get player data for %s, retrying: %v", i+1, member.User.ID, err)
+			time.Sleep(time.Second * time.Duration(i+1)) // Progressive delay
+			continue
+		}
+		if player != nil {
+			break // Successfully found player
+		}
+		if i == maxRetries-1 {
+			return fmt.Errorf("no player data found for member %s after %d retries", member.User.ID, maxRetries)
+		}
+		log.Printf("Attempt %d: no player data found for %s, retrying", i+1, member.User.ID)
+		time.Sleep(time.Second * time.Duration(i+1)) // Progressive delay
 	}
 
 	// Create ticket channel
@@ -306,7 +331,22 @@ func HandleGuildMemberUpdate(ctx *common.ModuleContext) func(s *discordgo.Sessio
 		// Get the old member state to compare roles
 		if m.BeforeUpdate == nil {
 			// If we don't have before state, we can't compare roles
-			// Fall back to current polling system
+			// But we can still check if the member has the role and needs a ticket
+			log.Printf("Member update for %s (%s) without before state, checking current role status",
+				m.Member.User.Username, m.Member.User.ID)
+
+			// Get all active tickets to pass to processing function
+			activeTickets, err := getAllActiveTickets(ctx)
+			if err != nil {
+				log.Printf("Error fetching active tickets for member update: %v", err)
+				return
+			}
+
+			// Process based on current role status
+			err = processMemberRoleStatus(ctx, m.Member, activeTickets, globalConfig.MemberRoleID)
+			if err != nil {
+				log.Printf("Error processing member role status for %s: %v", m.Member.User.ID, err)
+			}
 			return
 		}
 
