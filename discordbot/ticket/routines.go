@@ -211,6 +211,22 @@ func removeTicketForMember(ctx *common.ModuleContext, ticket *Ticket) error {
 		return fmt.Errorf("failed to deactivate ticket in database: %w", err)
 	}
 
+	// Clear player.ticket_channel field
+	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), ticket.DiscordID)
+	if err != nil {
+		log.Printf("Error getting player to clear ticket_channel for discord ID %s: %v", ticket.DiscordID, err)
+		// Don't return error as ticket cleanup was successful
+	} else if player != nil {
+		player.TicketChannel = ""
+		err = types.UpdatePlayer(ctx.Context, ctx.DB(), player)
+		if err != nil {
+			log.Printf("Error clearing ticket_channel for player %s: %v", player.IGN, err)
+			// Don't return error as ticket cleanup was successful
+		} else {
+			log.Printf("Successfully cleared ticket_channel for player %s", player.IGN)
+		}
+	}
+
 	return nil
 }
 

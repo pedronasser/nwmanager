@@ -261,6 +261,16 @@ func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, p
 		// Don't return error as the ticket channel was created successfully
 	}
 
+	// Update player.ticket_channel with the channel ID
+	player.TicketChannel = channel.ID
+	err = types.UpdatePlayer(ctx.Context, ctx.DB(), player)
+	if err != nil {
+		log.Printf("Error updating player ticket_channel for player %s: %v", player.IGN, err)
+		// Don't return error as the ticket channel was created successfully
+	} else {
+		log.Printf("Successfully updated player %s with ticket channel %s", player.IGN, channel.ID)
+	}
+
 	return nil
 }
 
