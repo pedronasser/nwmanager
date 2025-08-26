@@ -12,3 +12,5 @@ applyTo: "app/models/**/*.go"
   - review the existing code and understand its functionality.
   - consider potential edge cases and how to handle them.
   - wait for approval before making any changes.
+- error strings should not be capitalized
+- follow go-staticcheck rules

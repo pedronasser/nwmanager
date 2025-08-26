@@ -129,12 +129,31 @@ func processMemberRoleStatus(ctx *common.ModuleContext, member *discordgo.Member
 		}
 	}
 
-	log.Printf("Processing member %s (%s): hasMemberRole=%v, hasExistingTicket=%v",
-		member.User.Username, member.User.ID, hasMemberRole, existingTicket != nil)
+	// Also check if player has ticket_channel set and verify the channel exists
+	var hasValidTicketChannel bool
+	if existingTicket == nil && hasMemberRole {
+		player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), member.User.ID)
+		if err == nil && player != nil && player.TicketChannel != "" {
+			// Check if the channel actually exists in Discord
+			_, err := ctx.Session().Channel(player.TicketChannel)
+			if err == nil {
+				hasValidTicketChannel = true
+				log.Printf("Member %s has valid ticket channel %s (not in active tickets DB)", member.User.ID, player.TicketChannel)
+			} else {
+				// Channel doesn't exist, clear the field
+				log.Printf("Member %s has invalid ticket channel %s (channel doesn't exist), clearing field", member.User.ID, player.TicketChannel)
+				player.TicketChannel = ""
+				types.UpdatePlayer(ctx.Context, ctx.DB(), player)
+			}
+		}
+	}
+
+	log.Printf("Processing member %s (%s): hasMemberRole=%v, hasExistingTicket=%v, hasValidTicketChannel=%v",
+		member.User.Username, member.User.ID, hasMemberRole, existingTicket != nil, hasValidTicketChannel)
 
 	if hasMemberRole {
 		// Member has role but no ticket - create one
-		if existingTicket == nil {
+		if existingTicket == nil && !hasValidTicketChannel {
 			log.Printf("Creating ticket for member %s who has role but no ticket", member.User.ID)
 			err := createTicketForMember(ctx, member)
 			if err != nil {
@@ -162,29 +181,17 @@ func processMemberRoleStatus(ctx *common.ModuleContext, member *discordgo.Member
 }
 
 func createTicketForMember(ctx *common.ModuleContext, member *discordgo.Member) error {
-	// Get player data with retry logic in case of timing issues
-	var player *types.Player
-	var err error
-
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		player, err = types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), member.User.ID)
-		if err != nil {
-			if i == maxRetries-1 {
-				return fmt.Errorf("failed to get player data after %d retries: %w", maxRetries, err)
-			}
-			log.Printf("Attempt %d failed to get player data for %s, retrying: %v", i+1, member.User.ID, err)
-			time.Sleep(time.Second * time.Duration(i+1)) // Progressive delay
-			continue
-		}
-		if player != nil {
-			break // Successfully found player
-		}
-		if i == maxRetries-1 {
-			return fmt.Errorf("no player data found for member %s after %d retries", member.User.ID, maxRetries)
-		}
-		log.Printf("Attempt %d: no player data found for %s, retrying", i+1, member.User.ID)
-		time.Sleep(time.Second * time.Duration(i+1)) // Progressive delay
+	// Get player data
+	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), member.User.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get player data: %w", err)
+	}
+	if player == nil {
+		// User has Member role but no player data - this is not an error condition
+		// This can happen if someone was manually given the role or their player data was removed
+		log.Printf("Member %s (%s) has Member role but no player data - skipping ticket creation",
+			member.User.Username, member.User.ID)
+		return nil
 	}
 
 	// Create ticket channel
