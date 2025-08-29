@@ -818,61 +818,66 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		return fmt.Errorf("registration not found")
 	}
 
-	// Check if player already exists
-	existingPlayer, err := types.GetPlayerByDiscordID(context.Background(), ctx.DB(), registration.DiscordID)
-	if err != nil {
-		log.Printf("Error checking existing player: %v", err)
-		// Continue with creation if we can't check
-	}
+	var existingPlayer *types.Player
 
-	// Create new player record
-	now := helpers.GetCurrentTimeAsUTC()
+	// Only create player record for member registrations, not complete registrations
+	if registration.RegistrationType != string(RegistrationTypeComplete) {
+		// Check if player already exists
+		existingPlayer, err = types.GetPlayerByDiscordID(context.Background(), ctx.DB(), registration.DiscordID)
+		if err != nil {
+			log.Printf("Error checking existing player: %v", err)
+			// Continue with creation if we can't check
+		}
 
-	// Ensure empty slices are not nil for database consistency
-	availableTimes := registration.Hours
-	if availableTimes == nil {
-		availableTimes = []string{}
-	}
+		// Create new player record
+		now := helpers.GetCurrentTimeAsUTC()
 
-	availableWeekdays := registration.WeekDays
-	if availableWeekdays == nil {
-		availableWeekdays = []string{}
-	}
+		// Ensure empty slices are not nil for database consistency
+		availableTimes := registration.Hours
+		if availableTimes == nil {
+			availableTimes = []string{}
+		}
 
-	player := &types.Player{
-		ID:                primitive.NewObjectID(),
-		DiscordID:         registration.DiscordID,
-		IGN:               registration.InGameName,
-		PVPClasses:        registration.PVPClasses,
-		AvailableTimes:    availableTimes,
-		AvailableWeekdays: availableWeekdays,
-		HasWarExperience:  registration.HasWarExperience,
-		PreviousGuildName: registration.PreviousGuildName,
-		BuildStatus:       globals.BUILD_MISSING, // Default status for new players
-		WarClass:          string(registration.PVPClasses[0]), // Assuming first class is the war class
-		RegisteredAt:      &now,
-		Stats:             &types.PlayerStats{},
+		availableWeekdays := registration.WeekDays
+		if availableWeekdays == nil {
+			availableWeekdays = []string{}
+		}
+
+		player := &types.Player{
+			ID:                primitive.NewObjectID(),
+			DiscordID:         registration.DiscordID,
+			IGN:               registration.InGameName,
+			PVPClasses:        registration.PVPClasses,
+			AvailableTimes:    availableTimes,
+			AvailableWeekdays: availableWeekdays,
+			HasWarExperience:  registration.HasWarExperience,
+			PreviousGuildName: registration.PreviousGuildName,
+			BuildStatus:       globals.BUILD_MISSING, // Default status for new players
+			WarClass:          string(registration.PVPClasses[0]), // Assuming first class is the war class
+			RegisteredAt:      &now,
+			Stats:             &types.PlayerStats{},
+		}
+
+		// If player exists, delete the old record first
+		if existingPlayer != nil {
+			log.Printf("Existing player found for Discord ID %s, removing old record", registration.DiscordID)
+			err = types.DeletePlayer(context.Background(), ctx.DB(), existingPlayer)
+			if err != nil {
+				log.Printf("Error deleting existing player: %v", err)
+				// Continue anyway - we'll create the new record
+			}
+		}
+
+		// Insert new player record
+		err = types.InsertPlayer(context.Background(), ctx.DB(), player)
+		if err != nil {
+			return fmt.Errorf("error creating player: %v", err)
+		}
 	}
 
 	err = types.ApproveRegister(context.Background(), ctx.DB(), registrationID, approverID)
 	if err != nil {
 		return fmt.Errorf("error approving registration: %v", err)
-	}
-
-	// If player exists, delete the old record first
-	if existingPlayer != nil {
-		log.Printf("Existing player found for Discord ID %s, removing old record", registration.DiscordID)
-		err = types.DeletePlayer(context.Background(), ctx.DB(), existingPlayer)
-		if err != nil {
-			log.Printf("Error deleting existing player: %v", err)
-			// Continue anyway - we'll create the new record
-		}
-	}
-
-	// Insert new player record
-	err = types.InsertPlayer(context.Background(), ctx.DB(), player)
-	if err != nil {
-		return fmt.Errorf("error creating player: %v", err)
 	}
 
 	// Assign appropriate role based on registration type
