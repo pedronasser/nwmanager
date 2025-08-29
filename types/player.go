@@ -23,6 +23,9 @@ type Player struct {
 	PVPClasses        []globals.PVPClassType `json:"pvp_classes" bson:"pvp_classes"`
 	AvailableTimes    []string               `json:"available_times" bson:"available_times"`
 	AvailableWeekdays []string               `json:"available_weekdays" bson:"available_weekdays"`
+	HasWarExperience  bool                   `json:"has_war_experience" bson:"has_war_experience"`
+	PreviousGuildName string                 `json:"previous_guild_name" bson:"previous_guild_name"`
+	BuildStatus       globals.BuildStatus    `json:"build_status" bson:"build_status"`
 	TicketChannel     string                 `json:"ticket_channel" bson:"ticket_channel"`
 	RegisteredAt      *time.Time             `json:"registered_at" bson:"registered_at"`
 	ArchivedAt        *time.Time             `json:"archived_at" bson:"archived_at"`

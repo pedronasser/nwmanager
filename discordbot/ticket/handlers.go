@@ -14,17 +14,19 @@ import (
 )
 
 var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
-	"ticket:send_build":        handleSendBuild,
-	"ticket:send_question":     handleSendQuestion,
-	"ticket:change_class":      handleChangeClass,
-	"ticket:view_build":        handleViewBuild,
-	"ticket:close_thread":      handleCloseThread,
-	"ticket:submit_build":      handleSubmitBuild,
-	"ticket:notify_absence":    handleNotifyAbsence,
-	"modal:absence_form":       handleAbsenceModal,
-	"select:class_selection":   handleClassSelection,
-	"/ausencia":                handleNotifyAbsence, // Slash command uses same handler as button
-	"/sync-ticket-permissions": handleSyncTicketPermissions,
+	"ticket:send_build":          handleSendBuild,
+	"ticket:send_question":       handleSendQuestion,
+	"ticket:change_class":        handleChangeClass,
+	"ticket:view_build":          handleViewBuild,
+	"ticket:close_thread":        handleCloseThread,
+	"ticket:submit_build":        handleSubmitBuild,
+	"ticket:notify_absence":      handleNotifyAbsence,
+	"ticket:change_build_status": handleChangeBuildStatus,
+	"ticket:build_status_select": handleBuildStatusSelect,
+	"modal:absence_form":         handleAbsenceModal,
+	"select:class_selection":     handleClassSelection,
+	"/ausencia":                  handleNotifyAbsence, // Slash command uses same handler as button
+	"/sync-ticket-permissions":   handleSyncTicketPermissions,
 }
 
 func handleSendBuild(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
@@ -584,6 +586,199 @@ func isImageAttachment(attachment *discordgo.MessageAttachment) bool {
 		strings.HasSuffix(strings.ToLower(attachment.Filename), ".png") ||
 		strings.HasSuffix(strings.ToLower(attachment.Filename), ".gif") ||
 		strings.HasSuffix(strings.ToLower(attachment.Filename), ".webp")
+}
+
+func handleChangeBuildStatus(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permissions
+	if !hasAdminPermission(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para alterar status de build.", 5*time.Second)
+		return
+	}
+
+	// Get player data for this ticket channel
+	player, err := types.GetPlayerByTicketChannel(ctx.Context, ctx.DB(), i.ChannelID)
+	if err != nil {
+		log.Printf("Error getting player by ticket channel: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao encontrar dados do jogador.", 5*time.Second)
+		return
+	}
+	if player == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Jogador não encontrado para este ticket.", 5*time.Second)
+		return
+	}
+
+	// Create select menu with build status options
+	var options []discordgo.SelectMenuOption
+	for status, name := range globals.BUILD_STATUS_NAMES {
+		emoji := globals.BUILD_STATUS_EMOJIS[status]
+		isDefault := player.BuildStatus == status
+
+		options = append(options, discordgo.SelectMenuOption{
+			Label:   name,
+			Value:   string(status),
+			Emoji:   &discordgo.ComponentEmoji{Name: emoji},
+			Default: isDefault,
+		})
+	}
+
+	// Send response with select menu
+	err = ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("🔧 **Alterar Status do Build para %s**\n\nSelecione o novo status:", player.IGN),
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.SelectMenu{
+							CustomID:    "ticket:build_status_select",
+							MenuType:    discordgo.StringSelectMenu,
+							Placeholder: "Selecione o status do build",
+							Options:     options,
+						},
+					},
+				},
+			},
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	})
+	if err != nil {
+		log.Printf("Error responding to build status change: %v", err)
+	}
+}
+
+func hasAdminPermission(member *discordgo.Member, adminRoleID string) bool {
+	if adminRoleID == "" {
+		return false
+	}
+	for _, roleID := range member.Roles {
+		if roleID == adminRoleID {
+			return true
+		}
+	}
+	return false
+}
+
+func handleBuildStatusSelect(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permissions
+	if !hasAdminPermission(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para alterar status de build.", 5*time.Second)
+		return
+	}
+
+	// Get the selected build status
+	values := i.MessageComponentData().Values
+	if len(values) == 0 {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Nenhum status selecionado.", 5*time.Second)
+		return
+	}
+
+	newStatus := globals.BuildStatus(values[0])
+
+	// Validate the status
+	if _, valid := globals.BUILD_STATUS_NAMES[newStatus]; !valid {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Status inválido.", 5*time.Second)
+		return
+	}
+
+	// Get player data for this ticket channel
+	player, err := types.GetPlayerByTicketChannel(ctx.Context, ctx.DB(), i.ChannelID)
+	if err != nil {
+		log.Printf("Error getting player by ticket channel: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao encontrar dados do jogador.", 5*time.Second)
+		return
+	}
+	if player == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Jogador não encontrado para este ticket.", 5*time.Second)
+		return
+	}
+
+	// Update player build status
+	oldStatus := player.BuildStatus
+	player.BuildStatus = newStatus
+
+	err = types.UpdatePlayer(ctx.Context, ctx.DB(), player)
+	if err != nil {
+		log.Printf("Error updating player build status: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao atualizar status do build.", 5*time.Second)
+		return
+	}
+
+	// Get status names and emojis
+	oldStatusName := globals.BUILD_STATUS_NAMES[oldStatus]
+	newStatusName := globals.BUILD_STATUS_NAMES[newStatus]
+	newStatusEmoji := globals.BUILD_STATUS_EMOJIS[newStatus]
+
+	// Reply with success message
+	err = ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("✅ **Status do build atualizado!**\n\n👤 **Jogador:** %s\n📊 **Status anterior:** %s\n📊 **Novo status:** %s %s\n👤 **Alterado por:** <@%s>",
+				player.IGN, oldStatusName, newStatusEmoji, newStatusName, i.Member.User.ID),
+			Components: []discordgo.MessageComponent{}, // Remove the select menu
+			Flags:      discordgo.MessageFlagsEphemeral,
+		},
+	})
+	if err != nil {
+		log.Printf("Error responding to build status select: %v", err)
+	}
+
+	// Update the main ticket message with new status
+	go updateTicketMessageWithNewStatus(ctx, i.ChannelID, player)
+
+	// Log the change
+	log.Printf("Admin %s (%s) changed build status for player %s from %s to %s",
+		i.Member.User.Username, i.Member.User.ID, player.IGN, oldStatus, newStatus)
+}
+
+func updateTicketMessageWithNewStatus(ctx *common.ModuleContext, channelID string, player *types.Player) {
+	// Get the ticket from database to find the message ID
+	ticket, err := getTicketByChannelID(ctx, channelID)
+	if err != nil || ticket == nil {
+		log.Printf("Error getting ticket for channel %s: %v", channelID, err)
+		return
+	}
+
+	// Get the current message
+	message, err := ctx.Session().ChannelMessage(channelID, ticket.MessageID)
+	if err != nil {
+		log.Printf("Error getting ticket message: %v", err)
+		return
+	}
+
+	// Update the title and color in the embed
+	if len(message.Embeds) > 0 {
+		embed := message.Embeds[0]
+		statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+		embed.Title = fmt.Sprintf("%s 🎫 Ticket - %s", statusEmoji, player.IGN)
+		embed.Color = globals.BUILD_STATUS_COLORS[player.BuildStatus]
+
+		// Update the message
+		_, err = ctx.Session().ChannelMessageEditComplex(&discordgo.MessageEdit{
+			Channel: channelID,
+			ID:      ticket.MessageID,
+			Embeds:  &[]*discordgo.MessageEmbed{embed},
+		})
+		if err != nil {
+			log.Printf("Error updating ticket message with new status: %v", err)
+		} else {
+			log.Printf("Successfully updated ticket message for player %s with new build status", player.IGN)
+		}
+	}
+
+	// Update the channel name with new status emoji
+	newChannelName := fmt.Sprintf("%s・%s", globals.BUILD_STATUS_EMOJIS[player.BuildStatus], player.IGN)
+	_, err = ctx.Session().ChannelEdit(channelID, &discordgo.ChannelEdit{
+		Name: newChannelName,
+	})
+	if err != nil {
+		log.Printf("Error updating channel name with new status: %v", err)
+	} else {
+		log.Printf("Successfully updated channel name for player %s with new build status", player.IGN)
+	}
 }
 
 // HandleTicketAction creates the main interaction handler

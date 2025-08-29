@@ -25,6 +25,8 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"btn:war_yes":                     handleWarExperienceYes,
 	"btn:war_no":                      handleWarExperienceNo,
 	"modal:guild_name":                handleGuildNameModal,
+	"btn:confirm_registration":        handleConfirmRegistration,
+	"btn:restart_registration":        handleRestartRegistration,
 	"btn:approve_registration":        approveRegistration,
 	"btn:reject_registration":         rejectRegistration,
 }
@@ -448,14 +450,19 @@ func handleGuildNameModal(ctx *common.ModuleContext, i *discordgo.InteractionCre
 		return
 	}
 
-	// Store guild name and complete registration
+	// Store guild name and move to confirmation step
 	state.PreviousGuildName = guildName
 
 	// Reply to interaction first
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Informações registradas com sucesso!", 1*time.Second)
 
-	// Complete registration
-	completeRegistration(ctx, state, i)
+	// Move to confirmation step
+	state.StepIndex++
+	processor := GetStepProcessor()
+	err := processor.ProcessStep(ctx, state, state.StepIndex)
+	if err != nil {
+		log.Printf("Error processing confirmation step: %v", err)
+	}
 }
 
 func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i *discordgo.InteractionCreate) {
@@ -463,14 +470,16 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 
 	// Create registration record in database
 	registration := &types.Register{
-		ID:               primitive.NewObjectID(),
-		DiscordID:        state.DiscordID,
-		InGameName:       state.IGN,
-		WeekDays:         state.Weekdays,   // Can be nil/empty if step was skipped
-		Hours:            state.Times,      // Can be nil/empty if step was skipped
-		PVPClasses:       state.PVPClasses, // Using weapons field for PVP classes
-		RegistrationType: string(state.RegistrationType),
-		CreatedAt:        time.Now(),
+		ID:                primitive.NewObjectID(),
+		DiscordID:         state.DiscordID,
+		InGameName:        state.IGN,
+		WeekDays:          state.Weekdays,   // Can be nil/empty if step was skipped
+		Hours:             state.Times,      // Can be nil/empty if step was skipped
+		PVPClasses:        state.PVPClasses, // Using weapons field for PVP classes
+		HasWarExperience:  state.HasWarExperience,
+		PreviousGuildName: state.PreviousGuildName,
+		RegistrationType:  string(state.RegistrationType),
+		CreatedAt:         time.Now(),
 	}
 
 	// Store in database (implement this based on your database layer)
@@ -486,7 +495,7 @@ func completeRegistration(ctx *common.ModuleContext, state *RegistrationState, i
 	if state.RegistrationType == RegistrationTypeComplete {
 		successMessage = "✅ Registro complete enviado com sucesso!"
 	} else {
-		successMessage = "✅ Dias selecionados com sucesso!"
+		successMessage = "✅ Registro de membro enviado com sucesso!"
 	}
 	discordutils.ReplyEphemeralMessage(dg, i, successMessage, 1*time.Second)
 
@@ -837,6 +846,9 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 		PVPClasses:        registration.PVPClasses,
 		AvailableTimes:    availableTimes,
 		AvailableWeekdays: availableWeekdays,
+		HasWarExperience:  registration.HasWarExperience,
+		PreviousGuildName: registration.PreviousGuildName,
+		BuildStatus:       globals.BUILD_MISSING, // Default status for new players
 		WarClass:          string(registration.PVPClasses[0]), // Assuming first class is the war class
 		RegisteredAt:      &now,
 		Stats:             &types.PlayerStats{},
@@ -902,6 +914,50 @@ func processApproval(ctx *common.ModuleContext, registrationID, approverID, guil
 
 func processRejection(ctx *common.ModuleContext, registrationID, rejecterID string) error {
 	return types.RejectRegister(context.Background(), ctx.DB(), registrationID, rejecterID)
+}
+
+func handleConfirmRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	state, exists := RegisterData[i.Member.User.ID]
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
+		return
+	}
+
+	// Handle using the new step system
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
+	if err != nil {
+		log.Printf("Error handling confirmation step: %v", err)
+	}
+}
+
+func handleRestartRegistration(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	state, exists := RegisterData[i.Member.User.ID]
+	if !exists {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Registro não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Find the current step by handler type instead of hardcoded index
+	processor := GetStepProcessor()
+	currentStep := processor.GetStepByIndex(state.StepIndex)
+	if currentStep == nil || currentStep.Handler == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Passo inválido.", 5*time.Second)
+		return
+	}
+
+	// Handle using the new step system
+	err := processor.HandleStepResponse(ctx, state, state.StepIndex, i)
+	if err != nil {
+		log.Printf("Error handling restart step: %v", err)
+	}
 }
 
 // HandleRegistrationAction creates the main interaction handler

@@ -35,6 +35,32 @@ var PVP_CLASS_NAMES = map[PVPClassType]string{
 	PVP_CLASS_OFF_META:         "Off Meta (Outras classes)",
 }
 
+type BuildStatus string
+
+const (
+	BUILD_MISSING    BuildStatus = "missing"
+	BUILD_INCOMPLETE BuildStatus = "incomplete"
+	BUILD_READY      BuildStatus = "ready"
+)
+
+var BUILD_STATUS_NAMES = map[BuildStatus]string{
+	BUILD_MISSING:    "Build não enviada",
+	BUILD_INCOMPLETE: "Build Incompleta",
+	BUILD_READY:      "Build Pronta",
+}
+
+var BUILD_STATUS_EMOJIS = map[BuildStatus]string{
+	BUILD_MISSING:    "⚪", // White circle
+	BUILD_INCOMPLETE: "🟡", // Yellow circle
+	BUILD_READY:      "🟢", // Green circle
+}
+
+var BUILD_STATUS_COLORS = map[BuildStatus]int{
+	BUILD_MISSING:    0x808080, // Gray
+	BUILD_INCOMPLETE: 0xFFFF00, // Yellow
+	BUILD_READY:      0x00FF00, // Green
+}
+
 var PVP_CLASS_OPTIONS = []PVPClassType{
 	PVP_CLASS_DISRUPTOR,
 	PVP_CLASS_HEALER,

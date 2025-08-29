@@ -200,24 +200,68 @@ func createTicketMessageComponents() []discordgo.MessageComponent {
 						Name: "📅",
 					},
 				},
-				// discordgo.Button{
-				// 	Label:    "Ver Build Atual",
-				// 	Style:    discordgo.SecondaryButton,
-				// 	CustomID: "ticket:view_build",
-				// 	Emoji: &discordgo.ComponentEmoji{
-				// 		Name: "👁️",
-				// 	},
-				// },
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Alterar Status",
+					Style:    discordgo.PrimaryButton,
+					CustomID: "ticket:change_build_status",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: "🔧",
+					},
+				},
 			},
 		},
 	}
 }
 
 func setupTicketMessage(ctx *common.ModuleContext, channel *discordgo.Channel, player *types.Player) error {
+	// Get build status emoji for title
+	statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+	if statusEmoji == "" {
+		statusEmoji = globals.BUILD_STATUS_EMOJIS[globals.BUILD_MISSING] // Default fallback
+	}
+
+	// Build embed fields with player information
+	var embedFields []*discordgo.MessageEmbedField
+
+	// War experience field
+	warExperienceValue := "Não"
+	if player.HasWarExperience {
+		warExperienceValue = "Sim"
+	}
+	embedFields = append(embedFields, &discordgo.MessageEmbedField{
+		Name:   "⚔️ Experiência em Guerras?",
+		Value:  warExperienceValue,
+		Inline: true,
+	})
+
+	// Previous guild name field
+	guildValue := "Nenhuma"
+	if player.HasWarExperience && player.PreviousGuildName != "" {
+		guildValue = player.PreviousGuildName
+	} else if !player.HasWarExperience {
+		guildValue = "N/A" // User has no war experience, so previous guilds don't apply
+	}
+	embedFields = append(embedFields, &discordgo.MessageEmbedField{
+		Name:   "🏛️ Guild(s) Anterior(es):",
+		Value:  guildValue,
+		Inline: true,
+	})
+
+	// Get embed color based on build status
+	embedColor := globals.BUILD_STATUS_COLORS[player.BuildStatus]
+	if embedColor == 0 {
+		embedColor = globals.BUILD_STATUS_COLORS[globals.BUILD_MISSING] // Default fallback
+	}
+
 	embed := &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("🎫 Ticket - %s", player.IGN),
+		Title:       fmt.Sprintf("%s 🎫 Ticket - %s", statusEmoji, player.IGN),
 		Description: fmt.Sprintf("Bem-vindo(a) ao seu ticket pessoal, **%s**!", player.IGN),
-		Color:       0x00ff00,
+		Color:       embedColor,
+		Fields:      embedFields,
 		Timestamp:   time.Now().Format(time.RFC3339),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "Use os botões abaixo para interagir com o ticket",
@@ -346,7 +390,7 @@ func syncAllTicketPermissions(ctx *common.ModuleContext) error {
 
 	for i, ticket := range activeTickets {
 		log.Printf("Processing ticket %d/%d: %s (player: %s)", i+1, len(activeTickets), ticket.ChannelID, ticket.PlayerIGN)
-		
+
 		moved, err := syncTicketPermissions(ctx, &ticket, globalConfig, ticketConfig)
 		if err != nil {
 			log.Printf("Error syncing permissions for ticket %s (player: %s): %v", ticket.ChannelID, ticket.PlayerIGN, err)
@@ -362,11 +406,11 @@ func syncAllTicketPermissions(ctx *common.ModuleContext) error {
 	}
 
 	log.Printf("Permission sync completed. Total: %d, Synced: %d, Moved: %d, Errors: %d", len(activeTickets), syncedCount, movedCount, errorCount)
-	
+
 	if errorCount > 0 {
 		return fmt.Errorf("completed with %d errors out of %d tickets", errorCount, len(activeTickets))
 	}
-	
+
 	return nil
 }
 

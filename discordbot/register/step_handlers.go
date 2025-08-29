@@ -2,9 +2,11 @@ package register
 
 import (
 	"fmt"
+	"log"
 	"nwmanager/discordbot/common"
 	"nwmanager/discordbot/globals"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -299,8 +301,187 @@ func handleWarExperienceStep(ctx *common.ModuleContext, state *RegistrationState
 			state.HasWarExperience = false
 			state.PreviousGuildName = ""
 
-			// This is the last step, complete registration
+			// Move to confirmation step instead of completing directly
+			state.StepIndex++
+
+			processor := GetStepProcessor()
+			return processor.ProcessStep(ctx, state, state.StepIndex)
+		}
+	}
+	return nil
+}
+
+// Confirmation Step - Button
+func createConfirmationStep(ctx *common.ModuleContext, state *RegistrationState) (*discordgo.MessageSend, error) {
+	processor := GetStepProcessor()
+	globalCfg, _ := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Build a readable summary of all collected information
+	var summaryFields []*discordgo.MessageEmbedField
+
+	// IGN field
+	summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+		Name:   "🎮 Nome no Jogo",
+		Value:  state.IGN,
+		Inline: true,
+	})
+
+	// PVP Classes field
+	var classNames []string
+	for _, class := range state.PVPClasses {
+		if name, exists := globals.PVP_CLASS_NAMES[class]; exists {
+			if emoji, emojiExists := globalCfg.ClassEmojiIDs[string(class)]; emojiExists {
+				classNames = append(classNames, fmt.Sprintf("%s %s", emoji, name))
+			} else {
+				classNames = append(classNames, name)
+			}
+		}
+	}
+	summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+		Name:   "⚔️ Classes de PvP",
+		Value:  strings.Join(classNames, ", "),
+		Inline: true,
+	})
+
+	// Times field (if collected)
+	if len(state.Times) > 0 {
+		var timeNames []string
+		for _, timeKey := range state.Times {
+			if name, exists := TIMES[timeKey]; exists {
+				timeNames = append(timeNames, name)
+			}
+		}
+		summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+			Name:   "⏰ Horários",
+			Value:  strings.Join(timeNames, ", "),
+			Inline: false,
+		})
+	}
+
+	// Weekdays field (if collected)
+	if len(state.Weekdays) > 0 {
+		var weekdayNames []string
+		for _, weekdayKey := range state.Weekdays {
+			if name, exists := WEEKDAYS[weekdayKey]; exists {
+				weekdayNames = append(weekdayNames, name)
+			}
+		}
+		summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+			Name:   "📅 Dias da Semana",
+			Value:  strings.Join(weekdayNames, ", "),
+			Inline: false,
+		})
+	}
+
+	// War experience field
+	warExperienceValue := "Não participou de guerras"
+	if state.HasWarExperience {
+		if state.PreviousGuildName != "" {
+			warExperienceValue = fmt.Sprintf("Sim - Guild: %s", state.PreviousGuildName)
+		} else {
+			warExperienceValue = "Sim"
+		}
+	}
+	summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+		Name:   "⚔️ Experiência em Guerras",
+		Value:  warExperienceValue,
+		Inline: false,
+	})
+
+	// Registration type field
+	registrationTypeValue := "Membro"
+	if state.RegistrationType == RegistrationTypeComplete {
+		registrationTypeValue = "Complete"
+	}
+	summaryFields = append(summaryFields, &discordgo.MessageEmbedField{
+		Name:   "📝 Tipo de Registro",
+		Value:  registrationTypeValue,
+		Inline: false,
+	})
+
+	embed := &discordgo.MessageEmbed{
+		Title:       processor.GetStepTitle(state.StepIndex),
+		Description: "**Por favor, revise todas as suas informações abaixo:**\n\n🔍 Verifique se todos os dados estão corretos antes de continuar.",
+		Color:       0xffaa00,
+		Fields:      summaryFields,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Última chance de revisar suas informações antes do envio",
+		},
+	}
+
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    "Confirmar",
+					Style:    discordgo.SuccessButton,
+					CustomID: "btn:confirm_registration",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: "✅",
+					},
+				},
+				discordgo.Button{
+					Label:    "Reiniciar Processo",
+					Style:    discordgo.SecondaryButton,
+					CustomID: "btn:restart_registration",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: "🔄",
+					},
+				},
+			},
+		},
+	}
+
+	return &discordgo.MessageSend{
+		Embeds:     []*discordgo.MessageEmbed{embed},
+		Components: components,
+	}, nil
+}
+
+func handleConfirmationStep(ctx *common.ModuleContext, state *RegistrationState, interaction interface{}) error {
+	if i, ok := interaction.(*discordgo.InteractionCreate); ok {
+		customID := i.MessageComponentData().CustomID
+
+		switch customID {
+		case "btn:confirm_registration":
+			// User confirmed, proceed to completion
 			completeRegistration(ctx, state, i)
+			return nil
+
+		case "btn:restart_registration":
+			// User wants to restart, reset the state and go back to first step
+			dg := ctx.Session()
+
+			// Reply to interaction first
+			err := dg.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "🔄 Processo reiniciado! Começando novamente...",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			if err != nil {
+				return err
+			}
+
+			// Reset all state data
+			state.StepIndex = 0
+			state.IGN = ""
+			state.PVPClasses = nil
+			state.Times = nil
+			state.Weekdays = nil
+			state.HasWarExperience = false
+			state.PreviousGuildName = ""
+
+			// Wait a moment before showing the first step
+			go func() {
+				time.Sleep(1 * time.Second)
+				processor := GetStepProcessor()
+				if err := processor.ProcessStep(ctx, state, 0); err != nil {
+					log.Printf("Error restarting registration process: %v", err)
+				}
+			}()
+
 			return nil
 		}
 	}

@@ -23,6 +23,8 @@ type Register struct {
 	WeekDays         []string               `bson:"week_days" json:"week_days"`
 	Hours            []string               `bson:"hours" json:"hours"`
 	PVPClasses       []globals.PVPClassType `bson:"pvp_classes" json:"pvp_classes"`
+	HasWarExperience bool                   `bson:"has_war_experience" json:"has_war_experience"`
+	PreviousGuildName string               `bson:"previous_guild_name" json:"previous_guild_name"`
 	RegistrationType string                 `bson:"registration_type" json:"registration_type"`
 	CreatedAt        time.Time              `bson:"created_at" json:"created_at"`
 	ApprovedBy       string                 `bson:"approved_by" json:"approved_by"`

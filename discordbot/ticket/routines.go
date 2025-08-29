@@ -256,8 +256,17 @@ func createTicketChannel(ctx *common.ModuleContext, member *discordgo.Member, pl
 		categoryID = config.TicketCategoryID
 	}
 
+	// Get build status emoji for channel name
+	statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+	if statusEmoji == "" {
+		statusEmoji = globals.BUILD_STATUS_EMOJIS[globals.BUILD_MISSING] // Default fallback
+	}
+
+	// Create channel name with status emoji
+	channelName := fmt.Sprintf("%s・%s", statusEmoji, player.IGN)
+
 	channel, err := ctx.Session().GuildChannelCreateComplex(globalConfig.GuildID, discordgo.GuildChannelCreateData{
-		Name:     player.IGN,
+		Name:     channelName,
 		Type:     discordgo.ChannelTypeGuildText,
 		ParentID: categoryID,
 		PermissionOverwrites: []*discordgo.PermissionOverwrite{
