@@ -3,4 +3,4 @@
 .DS_Store
 *.png
 bin
-static/players.csv
+static/*.csv

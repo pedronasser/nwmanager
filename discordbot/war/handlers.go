@@ -1,0 +1,391 @@
+package war
+
+import (
+	"fmt"
+	"log"
+	"nwmanager/discordbot/common"
+	"nwmanager/discordbot/discordutils"
+	"nwmanager/discordbot/globals"
+	"nwmanager/types"
+	"strings"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.InteractionCreate){
+	COMMAND_CREATE_WAR:       handleCreateWarCommand,
+	COMMAND_CANCEL_WAR:       handleCancelWarCommand,
+	MODAL_CREATE_WAR:         handleCreateWarModal,
+	BUTTON_PARTICIPATE_YES:   handleParticipateYes,
+	BUTTON_PARTICIPATE_NO:    handleParticipateNo,
+	BUTTON_PARTICIPATE_MAYBE: handleParticipateMaybe,
+	BUTTON_EDIT_WAR:          handleEditWar,
+}
+
+// Handle the /criar-guerra command
+func handleCreateWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permission
+	if !discordutils.HasRole(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para criar guerras.", 5*time.Second)
+		return
+	}
+
+	// Check if there are any active wars
+	activeWars, err := types.GetActiveWars(ctx.Context, ctx.DB())
+	if err != nil {
+		log.Printf("Error checking active wars: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao verificar guerras ativas.", 5*time.Second)
+		return
+	}
+
+	if len(activeWars) > 0 {
+		// There are active wars, don't allow creating a new one
+		activeWar := activeWars[0] // Get the first active war for details
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+			fmt.Sprintf("❌ Já existe uma guerra ativa: **%s** (vs %s) agendada para <t:%d:F>.\n\nPara criar uma nova guerra, primeiro cancele a guerra atual usando `/cancelar-guerra`.",
+				activeWar.FortName, activeWar.OpponentGuild, activeWar.ScheduledAt.Unix()),
+			10*time.Second)
+		return
+	}
+
+	// Send modal for war creation
+	err = discordutils.SendModal(ctx.Session(), i, MODAL_CREATE_WAR, "Criar Nova Guerra",
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "fort_name",
+					Label:       "Nome do Forte",
+					Placeholder: "Ex: Forte do Vento",
+					Style:       discordgo.TextInputShort,
+					Required:    true,
+					MaxLength:   100,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "war_type",
+					Label:       "Tipo de Guerra (ataque ou defesa)",
+					Placeholder: "Digite: ataque ou defesa",
+					Style:       discordgo.TextInputShort,
+					Required:    true,
+					MaxLength:   10,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "opponent_guild",
+					Label:       "Guild Oponente",
+					Placeholder: "Ex: Inimigos Unidos",
+					Style:       discordgo.TextInputShort,
+					Required:    true,
+					MaxLength:   100,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "scheduled_date",
+					Label:       "Data da Guerra (DD/MM/AAAA)",
+					Placeholder: "Ex: 25/08/2025",
+					Style:       discordgo.TextInputShort,
+					Required:    true,
+					MinLength:   10,
+					MaxLength:   10,
+				},
+			},
+		},
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "scheduled_time",
+					Label:       "Horário da Guerra (HH:MM)",
+					Placeholder: "Ex: 20:00",
+					Style:       discordgo.TextInputShort,
+					Required:    true,
+					MinLength:   5,
+					MaxLength:   5,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		log.Printf("Error sending war creation modal: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao abrir formulário de criação.", 5*time.Second)
+	}
+}
+
+// Handle war creation modal submission
+func handleCreateWarModal(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	data := i.ModalSubmitData()
+
+	var fortName, opponentGuild, scheduledDate, scheduledTime, warTypeInput string
+
+	// Extract data from modal components
+	for _, component := range data.Components {
+		if actionRow, ok := component.(*discordgo.ActionsRow); ok {
+			for _, comp := range actionRow.Components {
+				if textInput, ok := comp.(*discordgo.TextInput); ok {
+					switch textInput.CustomID {
+					case "fort_name":
+						fortName = strings.TrimSpace(textInput.Value)
+					case "war_type":
+						warTypeInput = strings.TrimSpace(strings.ToLower(textInput.Value))
+					case "opponent_guild":
+						opponentGuild = strings.TrimSpace(textInput.Value)
+					case "scheduled_date":
+						scheduledDate = strings.TrimSpace(textInput.Value)
+					case "scheduled_time":
+						scheduledTime = strings.TrimSpace(textInput.Value)
+					}
+				}
+			}
+		}
+	}
+
+	// Validate and convert war type
+	var warType types.WarType
+	switch warTypeInput {
+	case "ataque", "attack":
+		warType = types.WarTypeAttack
+	case "defesa", "defense":
+		warType = types.WarTypeDefense
+	default:
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Tipo de guerra inválido. Use 'ataque' ou 'defesa'.", 5*time.Second)
+		return
+	}
+
+	// Validate inputs
+	if fortName == "" || warTypeInput == "" || opponentGuild == "" || scheduledDate == "" || scheduledTime == "" {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Todos os campos são obrigatórios.", 5*time.Second)
+		return
+	}
+
+	// Parse date and time
+	scheduledAt, err := parseDateTime(scheduledDate, scheduledTime)
+	if err != nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, fmt.Sprintf("❌ Erro ao processar data/hora: %v", err), 5*time.Second)
+		return
+	}
+
+	// Check if scheduled time is in the future
+	if scheduledAt.Before(time.Now()) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ A data e hora da guerra deve ser no futuro.", 5*time.Second)
+		return
+	}
+
+	// Create war object
+	now := time.Now()
+	war := &types.War{
+		ID:             primitive.NewObjectID(),
+		FortName:       fortName,
+		Type:           warType,
+		OpponentGuild:  opponentGuild,
+		ScheduledAt:    &scheduledAt,
+		CreatedAt:      &now,
+		CreatedBy:      i.Member.User.ID,
+		Participations: make(map[string]types.WarParticipation),
+		PlayerMessages: make(map[string]string),
+		Status:         types.WarStatusActive,
+	}
+
+	// Save to database
+	err = types.InsertWar(ctx.Context, ctx.DB(), war)
+	if err != nil {
+		log.Printf("Error inserting war: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao salvar guerra no banco de dados.", 5*time.Second)
+		return
+	}
+
+	// Reply to interaction first
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "✅ Guerra criada com sucesso!", 2*time.Second)
+
+	// Post war message to channel and send DMs to players
+	err = publishWar(ctx, war)
+	if err != nil {
+		log.Printf("Error publishing war: %v", err)
+	}
+}
+
+// Handle the /cancelar-guerra command
+func handleCancelWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permission
+	if !discordutils.HasRole(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para cancelar guerras.", 5*time.Second)
+		return
+	}
+
+	// Get all active wars
+	activeWars, err := types.GetActiveWars(ctx.Context, ctx.DB())
+	if err != nil {
+		log.Printf("Error getting active wars: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao buscar guerras ativas.", 5*time.Second)
+		return
+	}
+
+	if len(activeWars) == 0 {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Não há guerras ativas para cancelar.", 5*time.Second)
+		return
+	}
+
+	// For now, cancel the first active war (in the future, could add a selection menu if multiple wars)
+	war := activeWars[0]
+
+	// Archive the war (this will also clean up messages)
+	err = CancelWar(ctx, war)
+	if err != nil {
+		log.Printf("Error canceling war %s: %v", war.ID.Hex(), err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao cancelar a guerra.", 5*time.Second)
+		return
+	}
+
+	// Reply with success message
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+		fmt.Sprintf("✅ Guerra **%s** (vs %s) foi cancelada com sucesso!\n\nTodas as mensagens relacionadas foram removidas.",
+			war.FortName, war.OpponentGuild),
+		0)
+
+	log.Printf("War %s (%s vs %s) was canceled by admin %s",
+		war.ID.Hex(), war.FortName, war.OpponentGuild, i.Member.User.Username)
+}
+
+// Handle participation responses
+func handleParticipateYes(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	handleParticipation(ctx, i, types.WarParticipationYes)
+}
+
+func handleParticipateNo(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	handleParticipation(ctx, i, types.WarParticipationNo)
+}
+
+func handleParticipateMaybe(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	handleParticipation(ctx, i, types.WarParticipationMaybe)
+}
+
+// Generic participation handler
+func handleParticipation(ctx *common.ModuleContext, i *discordgo.InteractionCreate, participation types.WarParticipation) {
+	// Extract war ID from custom ID (format: war_participate:yes:WAR_ID)
+	parts := strings.Split(i.MessageComponentData().CustomID, ":")
+	if len(parts) < 3 {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro interno: ID inválido.", 5*time.Second)
+		return
+	}
+
+	warID := parts[2]
+
+	// Get war from database
+	war, err := types.GetWarByID(ctx.Context, ctx.DB(), warID)
+	if err != nil || war == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Guerra não encontrada.", 5*time.Second)
+		return
+	}
+
+	// Check if war is still active
+	if war.Status != types.WarStatusActive {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Esta guerra já foi finalizada.", 5*time.Second)
+		return
+	}
+
+	// Update participation
+	if war.Participations == nil {
+		war.Participations = make(map[string]types.WarParticipation)
+	}
+
+	playerID := i.Member.User.ID
+	oldParticipation := war.Participations[playerID]
+	war.Participations[playerID] = participation
+
+	// Save to database
+	err = types.UpdateWar(ctx.Context, ctx.DB(), war)
+	if err != nil {
+		log.Printf("Error updating war participation: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao salvar resposta.", 5*time.Second)
+		return
+	}
+
+	// Get participation text
+	participationText := getParticipationText(participation)
+
+	// Reply to user
+	if oldParticipation == "" {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+			fmt.Sprintf("✅ Resposta registrada: **%s**", participationText), 1*time.Second)
+	} else {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+			fmt.Sprintf("✅ Resposta alterada para: **%s**", participationText), 1*time.Second)
+	}
+
+	// Update war message in channel with new counts
+	err = updateWarMessage(ctx, war)
+	if err != nil {
+		log.Printf("Error updating war message: %v", err)
+	}
+
+	// Update player's private message
+	err = updatePlayerMessage(ctx, war, playerID, participation)
+	if err != nil {
+		log.Printf("Error updating player message: %v", err)
+	}
+}
+
+// Handle war editing (admin only)
+func handleEditWar(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permission
+	if !discordutils.HasRole(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para editar guerras.", 5*time.Second)
+		return
+	}
+
+	// TODO: Implement war editing functionality
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "🚧 Funcionalidade de edição em desenvolvimento.", 5*time.Second)
+}
+
+// HandleWarAction creates the main interaction handler
+func HandleWarAction(ctx *common.ModuleContext, guildID string) func(*discordgo.Session, *discordgo.InteractionCreate) {
+	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.GuildID != guildID {
+			return
+		}
+
+		var handlerKey string
+		switch i.Type {
+		case discordgo.InteractionApplicationCommand:
+			handlerKey = "/" + i.ApplicationCommandData().Name
+		case discordgo.InteractionMessageComponent:
+			data := i.MessageComponentData()
+			// Handle participation buttons with war ID
+			if strings.HasPrefix(data.CustomID, "war_participate:") {
+				parts := strings.Split(data.CustomID, ":")
+				if len(parts) >= 2 {
+					handlerKey = "war_participate:" + parts[1]
+				}
+			} else if strings.Contains(data.CustomID, ":") {
+				parts := strings.Split(data.CustomID, ":")
+				if len(parts) >= 2 {
+					handlerKey = parts[0] + ":" + parts[1]
+				}
+			} else {
+				handlerKey = data.CustomID
+			}
+		case discordgo.InteractionModalSubmit:
+			handlerKey = i.ModalSubmitData().CustomID
+		}
+
+		if handler, exists := handlers[handlerKey]; exists {
+			handler(ctx, i)
+		}
+	}
+}
