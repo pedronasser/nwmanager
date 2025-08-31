@@ -198,7 +198,7 @@ func createWarEmbedWithMemberList(ctx *common.ModuleContext, war *types.War) *di
 			},
 			{
 				Name:   "Participação",
-				Value:  fmt.Sprintf("**%d/50** confirmados", confirmedCount),
+				Value:  fmt.Sprintf("**%d** confirmados", confirmedCount),
 				Inline: false,
 			},
 		},
@@ -425,7 +425,7 @@ func createPlayerWarEmbed(war *types.War) *discordgo.MessageEmbed {
 	embed := &discordgo.MessageEmbed{
 		Title:       fmt.Sprintf("⚔️ Guerra: %s", war.FortName),
 		Color:       color,
-		Description: "Você irá participar desta guerra?",
+		Description: "Você tem disponibilidade para participar desta guerra?",
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:   "Tipo",
@@ -462,7 +462,14 @@ func updateWarMessage(ctx *common.ModuleContext, war *types.War) error {
 		return nil
 	}
 
-	embed := createWarEmbedWithMemberList(ctx, war)
+	// Fetch latest war data to avoid race conditions
+	latestWar, err := types.GetWarByID(ctx.Context, ctx.DB(), war.ID.Hex())
+	if err != nil || latestWar == nil {
+		log.Printf("Error fetching latest war data for message update: %v", err)
+		return err
+	}
+
+	embed := createWarEmbedWithMemberList(ctx, latestWar)
 
 	edit := &discordgo.MessageEdit{
 		Channel: cfg.WarChannelID,
@@ -470,7 +477,7 @@ func updateWarMessage(ctx *common.ModuleContext, war *types.War) error {
 		Embeds:  &[]*discordgo.MessageEmbed{embed},
 	}
 
-	_, err := ctx.Session().ChannelMessageEditComplex(edit)
+	_, err = ctx.Session().ChannelMessageEditComplex(edit)
 	return err
 }
 
@@ -487,8 +494,16 @@ func updatePlayerMessage(ctx *common.ModuleContext, war *types.War, playerID str
 		return nil // No message to update
 	}
 
+	// Fetch latest war data to avoid race conditions
+	latestWar, err := types.GetWarByID(ctx.Context, ctx.DB(), war.ID.Hex())
+	if err != nil || latestWar == nil {
+		log.Printf("Error fetching latest war data for player message update: %v", err)
+		// Continue with the provided war data as fallback
+		latestWar = war
+	}
+
 	// Create updated embed with participation status
-	embed := createPlayerWarEmbed(war)
+	embed := createPlayerWarEmbed(latestWar)
 
 	// Add participation status field
 	participationText := getParticipationText(participation)
@@ -528,14 +543,14 @@ func updatePlayerMessage(ctx *common.ModuleContext, war *types.War, playerID str
 						Name: EMOJI_MAYBE,
 					},
 				},
-				discordgo.Button{
-					CustomID: fmt.Sprintf("war_participate:bench:%s", war.ID.Hex()),
-					Label:    "Banco",
-					Style:    discordgo.PrimaryButton,
-					Emoji: &discordgo.ComponentEmoji{
-						Name: EMOJI_BENCH,
-					},
-				},
+				// discordgo.Button{
+				// 	CustomID: fmt.Sprintf("war_participate:bench:%s", war.ID.Hex()),
+				// 	Label:    "Banco",
+				// 	Style:    discordgo.PrimaryButton,
+				// 	Emoji: &discordgo.ComponentEmoji{
+				// 		Name: EMOJI_BENCH,
+				// 	},
+				// },
 			},
 		},
 	}

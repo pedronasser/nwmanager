@@ -102,6 +102,21 @@ func UpdateWar(ctx context.Context, db database.Database, war *War) error {
 	return nil
 }
 
+// UpdateWarParticipation atomically updates a single player's participation in a war
+func UpdateWarParticipation(ctx context.Context, db database.Database, warID primitive.ObjectID, playerID string, participation WarParticipation) error {
+	update := bson.M{
+		"$set": bson.M{
+			"participations." + playerID: participation,
+		},
+	}
+	
+	_, err := db.Collection(globals.DB_PREFIX+WarsCollection).UpdateOne(ctx, bson.M{"_id": warID}, update)
+	if err != nil {
+		return fmt.Errorf("cannot update war participation: %v", err)
+	}
+	return nil
+}
+
 func GetActiveWars(ctx context.Context, db database.Database) ([]*War, error) {
 	cursor, err := db.Collection(globals.DB_PREFIX+WarsCollection).Find(ctx, bson.M{
 		"status": WarStatusActive,

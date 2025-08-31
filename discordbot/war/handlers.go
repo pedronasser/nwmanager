@@ -297,22 +297,22 @@ func handleParticipation(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 		return
 	}
 
-	// Update participation
-	if war.Participations == nil {
-		war.Participations = make(map[string]types.WarParticipation)
-	}
-
 	playerID := i.Member.User.ID
 	oldParticipation := war.Participations[playerID]
-	war.Participations[playerID] = participation
 
-	// Save to database
-	err = types.UpdateWar(ctx.Context, ctx.DB(), war)
+	// Atomically update participation in database
+	err = types.UpdateWarParticipation(ctx.Context, ctx.DB(), war.ID, playerID, participation)
 	if err != nil {
 		log.Printf("Error updating war participation: %v", err)
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao salvar resposta.", 5*time.Second)
 		return
 	}
+
+	// Update local war object for subsequent operations
+	if war.Participations == nil {
+		war.Participations = make(map[string]types.WarParticipation)
+	}
+	war.Participations[playerID] = participation
 
 	// Get participation text
 	participationText := getParticipationText(participation)
