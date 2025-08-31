@@ -217,9 +217,11 @@ func createWarEmbedWithMemberList(ctx *common.ModuleContext, war *types.War) *di
 
 // createMemberListFields creates embed fields with members grouped by war class
 func createMemberListFields(ctx *common.ModuleContext, war *types.War) []*discordgo.MessageEmbedField {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
 	// Get players who answered "Sim" or "Talvez"
 	confirmedPlayers := make(map[string][]string) // war_class -> []IGN
-	maybeePlayers := make(map[string][]string)    // war_class -> []IGN
+	var maybeePlayers []string                    // All maybe players together
 
 	for playerID, participation := range war.Participations {
 		if participation == types.WarParticipationYes || participation == types.WarParticipationMaybe {
@@ -237,7 +239,7 @@ func createMemberListFields(ctx *common.ModuleContext, war *types.War) []*discor
 			case types.WarParticipationYes:
 				confirmedPlayers[warClass] = append(confirmedPlayers[warClass], player.IGN)
 			case types.WarParticipationMaybe:
-				maybeePlayers[warClass] = append(maybeePlayers[warClass], player.IGN)
+				maybeePlayers = append(maybeePlayers, player.IGN)
 			}
 		}
 	}
@@ -248,9 +250,17 @@ func createMemberListFields(ctx *common.ModuleContext, war *types.War) []*discor
 	if len(confirmedPlayers) > 0 {
 		for warClass, players := range confirmedPlayers {
 			if len(players) > 0 {
-				value := fmt.Sprintf("%s %s", EMOJI_YES, strings.Join(players, ", "))
+				// Get class emoji if available
+				classEmoji := ""
+				if emoji, exists := globalConfig.ClassEmojiIDs[warClass]; exists {
+					classEmoji = emoji + " "
+				}
+
+				fieldName := fmt.Sprintf("%s%s", classEmoji, globals.PVP_CLASS_NAMES[globals.PVPClassType(warClass)])
+				value := strings.Join(players, ", ")
+
 				fields = append(fields, &discordgo.MessageEmbedField{
-					Name:   warClass,
+					Name:   fieldName,
 					Value:  value,
 					Inline: false,
 				})
@@ -258,18 +268,13 @@ func createMemberListFields(ctx *common.ModuleContext, war *types.War) []*discor
 		}
 	}
 
-	// Add maybe players ("Talvez") grouped by war class
+	// Add maybe players ("Talvez") in a single field
 	if len(maybeePlayers) > 0 {
-		for warClass, players := range maybeePlayers {
-			if len(players) > 0 {
-				value := fmt.Sprintf("%s %s", EMOJI_MAYBE, strings.Join(players, ", "))
-				fields = append(fields, &discordgo.MessageEmbedField{
-					Name:   warClass + " (Talvez)",
-					Value:  value,
-					Inline: false,
-				})
-			}
-		}
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "🤔 Talvez",
+			Value:  strings.Join(maybeePlayers, ", "),
+			Inline: false,
+		})
 	}
 
 	// If no confirmed or maybe players, add a placeholder
