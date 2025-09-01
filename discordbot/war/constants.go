@@ -17,7 +17,8 @@ const (
 	BUTTON_EDIT_WAR          = "war_edit"
 
 	// Select menu IDs
-	SELECT_WAR_TYPE = "select:war_type"
+	SELECT_WAR_TYPE     = "select:war_type"
+	SELECT_CANCEL_WAR   = "select:cancel_war"
 
 	// Cleanup routine interval
 	CLEANUP_INTERVAL = 1 * time.Minute

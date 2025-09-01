@@ -22,6 +22,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	BUTTON_PARTICIPATE_NO:    handleParticipateNo,
 	BUTTON_PARTICIPATE_MAYBE: handleParticipateMaybe,
 	BUTTON_EDIT_WAR:          handleEditWar,
+	SELECT_CANCEL_WAR:        handleCancelWarSelect,
 }
 
 // Handle the /criar-guerra command
@@ -34,26 +35,10 @@ func handleCreateWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionC
 		return
 	}
 
-	// Check if there are any active wars
-	activeWars, err := types.GetActiveWars(ctx.Context, ctx.DB())
-	if err != nil {
-		log.Printf("Error checking active wars: %v", err)
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao verificar guerras ativas.", 5*time.Second)
-		return
-	}
 
-	if len(activeWars) > 0 {
-		// There are active wars, don't allow creating a new one
-		activeWar := activeWars[0] // Get the first active war for details
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
-			fmt.Sprintf("❌ Já existe uma guerra ativa: **%s** (vs %s) agendada para <t:%d:F>.\n\nPara criar uma nova guerra, primeiro cancele a guerra atual usando `/cancelar-guerra`.",
-				activeWar.FortName, activeWar.OpponentGuild, activeWar.ScheduledAt.Unix()),
-			10*time.Second)
-		return
-	}
 
 	// Send modal for war creation
-	err = discordutils.SendModal(ctx.Session(), i, MODAL_CREATE_WAR, "Criar Nova Guerra",
+	err := discordutils.SendModal(ctx.Session(), i, MODAL_CREATE_WAR, "Criar Nova Guerra",
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.TextInput{
@@ -239,25 +224,77 @@ func handleCancelWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionC
 		return
 	}
 
-	// For now, cancel the first active war (in the future, could add a selection menu if multiple wars)
-	war := activeWars[0]
+	// If there's only one active war, cancel it directly
+	if len(activeWars) == 1 {
+		war := activeWars[0]
 
-	// Archive the war (this will also clean up messages)
-	err = CancelWar(ctx, war)
-	if err != nil {
-		log.Printf("Error canceling war %s: %v", war.ID.Hex(), err)
-		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao cancelar a guerra.", 5*time.Second)
+		// Archive the war (this will also clean up messages)
+		err = CancelWar(ctx, war)
+		if err != nil {
+			log.Printf("Error canceling war %s: %v", war.ID.Hex(), err)
+			discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao cancelar a guerra.", 5*time.Second)
+			return
+		}
+
+		// Reply with success message
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+			fmt.Sprintf("✅ Guerra **%s** (vs %s) foi cancelada com sucesso!\n\nTodas as mensagens relacionadas foram removidas.",
+				war.FortName, war.OpponentGuild),
+			0)
+
+		log.Printf("War %s (%s vs %s) was canceled by admin %s",
+			war.ID.Hex(), war.FortName, war.OpponentGuild, i.Member.User.Username)
 		return
 	}
 
-	// Reply with success message
-	discordutils.ReplyEphemeralMessage(ctx.Session(), i,
-		fmt.Sprintf("✅ Guerra **%s** (vs %s) foi cancelada com sucesso!\n\nTodas as mensagens relacionadas foram removidas.",
-			war.FortName, war.OpponentGuild),
-		0)
+	// Multiple active wars - show selection menu
+	var options []discordgo.SelectMenuOption
+	for _, war := range activeWars {
+		warTypeEmoji := EMOJI_ATTACK
+		warTypeText := "Ataque"
+		if war.Type == types.WarTypeDefense {
+			warTypeEmoji = EMOJI_DEFENSE
+			warTypeText = "Defesa"
+		}
 
-	log.Printf("War %s (%s vs %s) was canceled by admin %s",
-		war.ID.Hex(), war.FortName, war.OpponentGuild, i.Member.User.Username)
+		description := fmt.Sprintf("%s vs %s - <t:%d:F>", warTypeText, war.OpponentGuild, war.ScheduledAt.Unix())
+		
+		// Truncate description if too long (Discord limit is 100 chars)
+		if len(description) > 100 {
+			description = description[:97] + "..."
+		}
+
+		options = append(options, discordgo.SelectMenuOption{
+			Label:       fmt.Sprintf("%s %s", warTypeEmoji, war.FortName),
+			Value:       war.ID.Hex(),
+			Description: description,
+		})
+	}
+
+	// Send response with select menu
+	err = ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("🔍 Existem **%d** guerras ativas. Selecione qual guerra deseja cancelar:", len(activeWars)),
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.SelectMenu{
+							CustomID:    SELECT_CANCEL_WAR,
+							Placeholder: "Selecione a guerra para cancelar...",
+							Options:     options,
+						},
+					},
+				},
+			},
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error sending war selection menu: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao exibir lista de guerras.", 5*time.Second)
+	}
 }
 
 // Handle participation responses
@@ -351,6 +388,56 @@ func handleEditWar(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
 
 	// TODO: Implement war editing functionality
 	discordutils.ReplyEphemeralMessage(ctx.Session(), i, "🚧 Funcionalidade de edição em desenvolvimento.", 5*time.Second)
+}
+
+// Handle war selection for cancellation
+func handleCancelWarSelect(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user has admin permission
+	if !discordutils.HasRole(i.Member, globalConfig.AdminRoleID) {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você não tem permissão para cancelar guerras.", 5*time.Second)
+		return
+	}
+
+	// Get selected war ID from the select menu
+	data := i.MessageComponentData()
+	if len(data.Values) == 0 {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Nenhuma guerra selecionada.", 5*time.Second)
+		return
+	}
+
+	warID := data.Values[0]
+
+	// Get war from database
+	war, err := types.GetWarByID(ctx.Context, ctx.DB(), warID)
+	if err != nil || war == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Guerra não encontrada.", 5*time.Second)
+		return
+	}
+
+	// Check if war is still active
+	if war.Status != types.WarStatusActive {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Esta guerra já foi finalizada.", 5*time.Second)
+		return
+	}
+
+	// Cancel the war
+	err = CancelWar(ctx, war)
+	if err != nil {
+		log.Printf("Error canceling war %s: %v", war.ID.Hex(), err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao cancelar a guerra.", 5*time.Second)
+		return
+	}
+
+	// Reply with success message
+	discordutils.ReplyEphemeralMessage(ctx.Session(), i,
+		fmt.Sprintf("✅ Guerra **%s** (vs %s) foi cancelada com sucesso!\n\nTodas as mensagens relacionadas foram removidas.",
+			war.FortName, war.OpponentGuild),
+		0)
+
+	log.Printf("War %s (%s vs %s) was canceled by admin %s",
+		war.ID.Hex(), war.FortName, war.OpponentGuild, i.Member.User.Username)
 }
 
 // HandleWarAction creates the main interaction handler
