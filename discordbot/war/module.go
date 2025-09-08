@@ -71,6 +71,9 @@ func (w *WarModule) Setup(ctx *common.ModuleContext, config any) (bool, error) {
 	// Start cleanup routine
 	go warCleanupRoutine(ctx)
 
+	// Start message update routine
+	go warMessageUpdateRoutine(ctx)
+
 	return true, nil
 }
 

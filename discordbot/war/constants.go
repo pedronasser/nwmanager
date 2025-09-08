@@ -23,6 +23,9 @@ const (
 	// Cleanup routine interval
 	CLEANUP_INTERVAL = 1 * time.Minute
 
+	// Message update routine interval
+	MESSAGE_UPDATE_INTERVAL = 1 * time.Minute
+
 	// War participation emojis
 	EMOJI_YES   = "✅"
 	EMOJI_NO    = "❌"

@@ -267,3 +267,46 @@ func exportWarToCSV(ctx *common.ModuleContext, war *types.War) (string, error) {
 	log.Printf("Exported war %s (%s vs %s) to %s", war.FortName, war.FortName, war.OpponentGuild, filepath)
 	return filename, nil
 }
+
+// warMessageUpdateRoutine runs periodically to update war messages in channels
+func warMessageUpdateRoutine(ctx *common.ModuleContext) {
+	ticker := time.NewTicker(MESSAGE_UPDATE_INTERVAL)
+	defer ticker.Stop()
+
+	log.Printf("War message update routine started with interval: %v", MESSAGE_UPDATE_INTERVAL)
+
+	time.Sleep(10 * time.Second)
+
+	for {
+		select {
+		case <-ticker.C:
+			err := processWarMessageUpdates(ctx)
+			if err != nil {
+				log.Printf("Error in war message update routine: %v", err)
+			}
+
+		case <-ctx.Context.Done():
+			log.Println("War message update routine stopped")
+			return
+		}
+	}
+}
+
+// processWarMessageUpdates updates all active war messages
+func processWarMessageUpdates(ctx *common.ModuleContext) error {
+	wars, err := types.GetActiveWars(ctx.Context, ctx.DB())
+	if err != nil {
+		return err
+	}
+
+	for _, war := range wars {
+		if war.ChannelMessageID != "" {
+			err := updateWarMessage(ctx, war)
+			if err != nil {
+				log.Printf("Error updating war message for war %s: %v", war.ID.Hex(), err)
+			}
+		}
+	}
+
+	return nil
+}

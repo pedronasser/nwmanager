@@ -35,8 +35,6 @@ func handleCreateWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionC
 		return
 	}
 
-
-
 	// Send modal for war creation
 	err := discordutils.SendModal(ctx.Session(), i, MODAL_CREATE_WAR, "Criar Nova Guerra",
 		discordgo.ActionsRow{
@@ -258,7 +256,7 @@ func handleCancelWarCommand(ctx *common.ModuleContext, i *discordgo.InteractionC
 		}
 
 		description := fmt.Sprintf("%s vs %s - <t:%d:F>", warTypeText, war.OpponentGuild, war.ScheduledAt.Unix())
-		
+
 		// Truncate description if too long (Discord limit is 100 chars)
 		if len(description) > 100 {
 			description = description[:97] + "..."
@@ -312,6 +310,8 @@ func handleParticipateMaybe(ctx *common.ModuleContext, i *discordgo.InteractionC
 
 // Generic participation handler
 func handleParticipation(ctx *common.ModuleContext, i *discordgo.InteractionCreate, participation types.WarParticipation) {
+	log.Printf("User %s (%s) selected participation: %s", i.Member.User.Username, i.Member.User.ID, participation)
+
 	// Extract war ID from custom ID (format: war_participate:yes:WAR_ID)
 	parts := strings.Split(i.MessageComponentData().CustomID, ":")
 	if len(parts) < 3 {
@@ -361,12 +361,6 @@ func handleParticipation(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 	} else {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
 			fmt.Sprintf("✅ Resposta alterada para: **%s**", participationText), 1*time.Second)
-	}
-
-	// Update war message in channel with new counts
-	err = updateWarMessage(ctx, war)
-	if err != nil {
-		log.Printf("Error updating war message: %v", err)
 	}
 
 	// Update player's private message
