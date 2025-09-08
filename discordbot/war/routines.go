@@ -133,7 +133,7 @@ func cleanupObsoleteWarCSVFiles(expectedFiles map[string]bool) error {
 		// Check if file matches war CSV pattern (attack_*.csv or defense_*.csv)
 		if strings.HasPrefix(filename, "attack_") && strings.HasSuffix(filename, ".csv") ||
 			strings.HasPrefix(filename, "defense_") && strings.HasSuffix(filename, ".csv") {
-			
+
 			// If this file is not in our expected files list, remove it
 			if !expectedFiles[filename] {
 				filepath := fmt.Sprintf("static/%s", filename)
@@ -247,7 +247,12 @@ func exportWarToCSV(ctx *common.ModuleContext, war *types.War) (string, error) {
 			warClass = "Sem Classe"
 		}
 
-		line := fmt.Sprintf("\n%s,%s", player.IGN, warClass)
+		playerName := player.IGN
+		if participation == types.WarParticipationMaybe {
+			playerName = fmt.Sprintf("%s (Talvez)", playerName)
+		}
+
+		line := fmt.Sprintf("\n%s,%s", playerName, warClass)
 
 		_, err = csvFile.WriteString(line)
 		if err != nil {
