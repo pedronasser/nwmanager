@@ -16,7 +16,7 @@ func createIGNStep(ctx *common.ModuleContext, state *RegistrationState) (*discor
 	processor := GetStepProcessor()
 	embed := &discordgo.MessageEmbed{
 		Title:       processor.GetStepTitle(state.StepIndex),
-		Description: "**Qual é o seu nome no jogo (IGN)?**\n\nPor favor, digite seu nome exatamente como aparece no New World.",
+		Description: "**Qual é o nome do seu personagem?**\n\nSe, você tiver mais de um personagem, registre o nome do personagem que você usará com mais frequência.",
 		Color:       0x0099ff,
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "Digite sua resposta na próxima mensagem",
