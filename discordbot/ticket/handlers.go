@@ -294,9 +294,13 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 		}
 	}
 
-	// Move ticket to class-specific category, update name, and sync permissions in a single edit
+	// Move ticket to class-specific category, update name with build status, and sync permissions in a single edit
+	statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+	if statusEmoji == "" {
+		statusEmoji = globals.BUILD_STATUS_EMOJIS[globals.BUILD_MISSING]
+	}
 	channelEdit := &discordgo.ChannelEdit{
-		Name: player.IGN,
+		Name: fmt.Sprintf("%s・%s", statusEmoji, player.IGN),
 	}
 
 	if categoryID, exists := globalConfig.ClassCategoryIDs[selectedClass]; exists {
@@ -319,10 +323,13 @@ func handleClassSelection(ctx *common.ModuleContext, i *discordgo.InteractionCre
 
 	_, err = ctx.Session().ChannelEdit(i.ChannelID, channelEdit)
 	if err != nil {
-		log.Printf("Error updating channel (name: %s, category: %v): %v", player.IGN, channelEdit.ParentID, err)
+		log.Printf("Error updating channel (name: %s, category: %v): %v", channelEdit.Name, channelEdit.ParentID, err)
 	} else if channelEdit.ParentID != "" {
 		log.Printf("Successfully moved channel %s to category %s and synced permissions", i.ChannelID, channelEdit.ParentID)
 	}
+
+	// Update the ticket message with the new build status
+	go updateTicketMessageWithNewStatus(ctx, i.ChannelID, player)
 
 	// Optional: Delete the success message after a delay
 	go func() {

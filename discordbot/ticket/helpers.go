@@ -59,6 +59,9 @@ func getPlayerByTicketChannel(ctx *common.ModuleContext, channelID string) (*typ
 func updatePlayerClass(ctx *common.ModuleContext, player *types.Player, selectedClass string) error {
 	// Update player's war class
 	player.WarClass = selectedClass
+	
+	// Reset build status to missing when class changes
+	player.BuildStatus = globals.BUILD_MISSING
 
 	// Update in database
 	err := types.UpdatePlayer(context.Background(), ctx.DB(), player)
