@@ -7,6 +7,7 @@ const (
 	EmojiSendBuild      = "📸"
 	EmojiSendQuestion   = "❓"
 	EmojiChangeClass    = "⚔️"
+	EmojiChangeName     = "✏️"
 	EmojiViewBuild      = "👁️"
 	EmojiConfirmBuild   = "✅"
 	EmojiCloseThread    = "❌"

@@ -17,6 +17,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"ticket:send_build":          handleSendBuild,
 	"ticket:send_question":       handleSendQuestion,
 	"ticket:change_class":        handleChangeClass,
+	"ticket:change_name":         handleChangeName,
 	"ticket:view_build":          handleViewBuild,
 	"ticket:close_thread":        handleCloseThread,
 	"ticket:submit_build":        handleSubmitBuild,
@@ -24,6 +25,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	"ticket:change_build_status": handleChangeBuildStatus,
 	"ticket:build_status_select": handleBuildStatusSelect,
 	"modal:absence_form":         handleAbsenceModal,
+	"modal:change_name_form":     handleChangeNameModal,
 	"select:class_selection":     handleClassSelection,
 	"/ausencia":                  handleNotifyAbsence, // Slash command uses same handler as button
 	"/sync-ticket-permissions":   handleSyncTicketPermissions,
@@ -778,6 +780,209 @@ func updateTicketMessageWithNewStatus(ctx *common.ModuleContext, channelID strin
 		log.Printf("Error updating channel name with new status: %v", err)
 	} else {
 		log.Printf("Successfully updated channel name for player %s with new build status", player.IGN)
+	}
+}
+
+func handleChangeName(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user is admin or the ticket owner
+	isAdmin := discordutils.HasRole(i.Member, globalConfig.AdminRoleID)
+	isOwner := isTicketOwner(ctx, i.ChannelID, i.Member.User.ID)
+
+	if !isAdmin && !isOwner {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não tem permissão para usar este comando.", 5*time.Second)
+		return
+	}
+
+	// Get current player name for the modal
+	player, err := getPlayerByTicketChannel(ctx, i.ChannelID)
+	if err != nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao encontrar dados do jogador.", 5*time.Second)
+		return
+	}
+
+	// Create modal for name change
+	modal := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:    "new_player_name",
+					Label:       "Novo Nome do Jogador",
+					Style:       discordgo.TextInputShort,
+					Placeholder: "Digite o novo nome (IGN)",
+					Required:    true,
+					MaxLength:   50,
+					Value:       player.IGN, // Pre-fill with current name
+				},
+			},
+		},
+	}
+
+	err = discordutils.SendModal(ctx.Session(), i, "modal:change_name_form", "Alterar Nome do Jogador", modal...)
+	if err != nil {
+		log.Printf("Error sending change name modal: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao abrir formulário de alteração de nome.", 5*time.Second)
+	}
+}
+
+func handleChangeNameModal(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	globalConfig := ctx.Config("globals").(*globals.GlobalsConfig)
+
+	// Check if user is admin or the ticket owner
+	isAdmin := discordutils.HasRole(i.Member, globalConfig.AdminRoleID)
+	isOwner := isTicketOwner(ctx, i.ChannelID, i.Member.User.ID)
+
+	if !isAdmin && !isOwner {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Você não tem permissão para usar este comando.", 5*time.Second)
+		return
+	}
+
+	// Get form data
+	data := i.ModalSubmitData()
+	var newPlayerName string
+
+	for _, component := range data.Components {
+		if actionRow, ok := component.(*discordgo.ActionsRow); ok {
+			for _, comp := range actionRow.Components {
+				if textInput, ok := comp.(*discordgo.TextInput); ok {
+					if textInput.CustomID == "new_player_name" {
+						newPlayerName = strings.TrimSpace(textInput.Value)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Validate new name
+	if newPlayerName == "" {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Nome não pode estar vazio.", 5*time.Second)
+		return
+	}
+
+	// Get current player data
+	player, err := getPlayerByTicketChannel(ctx, i.ChannelID)
+	if err != nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "Erro ao encontrar dados do jogador.", 5*time.Second)
+		return
+	}
+
+	// Check if the name actually changed
+	if player.IGN == newPlayerName {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ O novo nome é igual ao nome atual!", 5*time.Second)
+		return
+	}
+
+	// Store old name for logging and response
+	oldName := player.IGN
+
+	// Update player name in database
+	player.IGN = newPlayerName
+	err = types.UpdatePlayer(ctx.Context, ctx.DB(), player)
+	if err != nil {
+		log.Printf("Error updating player name: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao atualizar nome do jogador no banco de dados.", 5*time.Second)
+		return
+	}
+
+	// Respond to the modal interaction
+	err = ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("✅ **Nome alterado com sucesso!**\n\n👤 **Nome anterior:** %s\n👤 **Novo nome:** %s\n👤 **Alterado por:** <@%s>",
+				oldName, newPlayerName, i.Member.User.ID),
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	})
+	if err != nil {
+		log.Printf("Error responding to change name modal: %v", err)
+		return
+	}
+
+	// Update Discord nickname
+	var newNickname string
+	if player.WarClass != "" {
+		classEmoji := globalConfig.ClassEmojiIDs[player.WarClass]
+		newNickname = fmt.Sprintf("%s %s", classEmoji, newPlayerName)
+	} else {
+		newNickname = newPlayerName
+	}
+
+	err = ctx.Session().GuildMemberNickname(globalConfig.GuildID, player.DiscordID, newNickname)
+	if err != nil {
+		log.Printf("Error updating nickname after name change: %v", err)
+	} else {
+		log.Printf("Successfully updated nickname for player %s to %s", newPlayerName, newNickname)
+	}
+
+	// Update channel name with status emoji
+	statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+	if statusEmoji == "" {
+		statusEmoji = globals.BUILD_STATUS_EMOJIS[globals.BUILD_MISSING]
+	}
+	newChannelName := fmt.Sprintf("%s・%s", statusEmoji, newPlayerName)
+	
+	_, err = ctx.Session().ChannelEdit(i.ChannelID, &discordgo.ChannelEdit{
+		Name: newChannelName,
+	})
+	if err != nil {
+		log.Printf("Error updating channel name after name change: %v", err)
+	} else {
+		log.Printf("Successfully updated channel name to %s", newChannelName)
+	}
+
+	// Update ticket message title and info
+	go updateTicketMessageWithNewName(ctx, i.ChannelID, player, oldName)
+
+	// Update ticket in database
+	ticket, err := getTicketByChannelID(ctx, i.ChannelID)
+	if err == nil && ticket != nil {
+		ticket.PlayerIGN = newPlayerName
+		err = updateTicket(ctx, ticket)
+		if err != nil {
+			log.Printf("Error updating ticket in database: %v", err)
+		}
+	}
+
+	// Log the change
+	log.Printf("Player name changed from %s to %s by %s (%s) in channel %s",
+		oldName, newPlayerName, i.Member.User.Username, i.Member.User.ID, i.ChannelID)
+}
+
+func updateTicketMessageWithNewName(ctx *common.ModuleContext, channelID string, player *types.Player, oldName string) {
+	// Get the ticket from database to find the message ID
+	ticket, err := getTicketByChannelID(ctx, channelID)
+	if err != nil || ticket == nil {
+		log.Printf("Error getting ticket for channel %s: %v", channelID, err)
+		return
+	}
+
+	// Get the current message
+	message, err := ctx.Session().ChannelMessage(channelID, ticket.MessageID)
+	if err != nil {
+		log.Printf("Error getting ticket message: %v", err)
+		return
+	}
+
+	// Update the title and description in the embed
+	if len(message.Embeds) > 0 {
+		embed := message.Embeds[0]
+		statusEmoji := globals.BUILD_STATUS_EMOJIS[player.BuildStatus]
+		embed.Title = fmt.Sprintf("%s 🎫 Ticket - %s", statusEmoji, player.IGN)
+		embed.Description = fmt.Sprintf("Bem-vindo(a) ao seu ticket pessoal, **%s**!", player.IGN)
+
+		// Update the message
+		_, err = ctx.Session().ChannelMessageEditComplex(&discordgo.MessageEdit{
+			Channel: channelID,
+			ID:      ticket.MessageID,
+			Embeds:  &[]*discordgo.MessageEmbed{embed},
+		})
+		if err != nil {
+			log.Printf("Error updating ticket message with new name: %v", err)
+		} else {
+			log.Printf("Successfully updated ticket message for player name change: %s -> %s", oldName, player.IGN)
+		}
 	}
 }
 

@@ -193,6 +193,14 @@ func createTicketMessageComponents() []discordgo.MessageComponent {
 					},
 				},
 				discordgo.Button{
+					Label:    "Alterar Nome",
+					Style:    discordgo.SecondaryButton,
+					CustomID: "ticket:change_name",
+					Emoji: &discordgo.ComponentEmoji{
+						Name: EmojiChangeName,
+					},
+				},
+				discordgo.Button{
 					Label:    "Avisar Ausência",
 					Style:    discordgo.SecondaryButton,
 					CustomID: "ticket:notify_absence",
