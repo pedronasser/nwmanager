@@ -14,6 +14,7 @@ const (
 	BUTTON_PARTICIPATE_YES   = "war_participate:yes"
 	BUTTON_PARTICIPATE_NO    = "war_participate:no"
 	BUTTON_PARTICIPATE_MAYBE = "war_participate:maybe"
+	BUTTON_CHANGE_ANSWER     = "war_change_answer"
 	BUTTON_EDIT_WAR          = "war_edit"
 
 	// Select menu IDs

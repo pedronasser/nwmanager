@@ -520,42 +520,18 @@ func updatePlayerMessage(ctx *common.ModuleContext, war *types.War, playerID str
 		Inline: false,
 	})
 
-	// Same components as before
+	// Show "Alterar Resposta" button instead of original options
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
-					CustomID: fmt.Sprintf("war_participate:yes:%s", war.ID.Hex()),
-					Label:    "Sim",
-					Style:    discordgo.SuccessButton,
+					CustomID: fmt.Sprintf("war_change_answer:%s", war.ID.Hex()),
+					Label:    "Alterar Resposta",
+					Style:    discordgo.PrimaryButton,
 					Emoji: &discordgo.ComponentEmoji{
-						Name: EMOJI_YES,
+						Name: "🔄",
 					},
 				},
-				discordgo.Button{
-					CustomID: fmt.Sprintf("war_participate:no:%s", war.ID.Hex()),
-					Label:    "Não",
-					Style:    discordgo.DangerButton,
-					Emoji: &discordgo.ComponentEmoji{
-						Name: EMOJI_NO,
-					},
-				},
-				discordgo.Button{
-					CustomID: fmt.Sprintf("war_participate:maybe:%s", war.ID.Hex()),
-					Label:    "Talvez",
-					Style:    discordgo.SecondaryButton,
-					Emoji: &discordgo.ComponentEmoji{
-						Name: EMOJI_MAYBE,
-					},
-				},
-				// discordgo.Button{
-				// 	CustomID: fmt.Sprintf("war_participate:bench:%s", war.ID.Hex()),
-				// 	Label:    "Banco",
-				// 	Style:    discordgo.PrimaryButton,
-				// 	Emoji: &discordgo.ComponentEmoji{
-				// 		Name: EMOJI_BENCH,
-				// 	},
-				// },
 			},
 		},
 	}

@@ -21,6 +21,7 @@ var handlers = map[string]func(ctx *common.ModuleContext, i *discordgo.Interacti
 	BUTTON_PARTICIPATE_YES:   handleParticipateYes,
 	BUTTON_PARTICIPATE_NO:    handleParticipateNo,
 	BUTTON_PARTICIPATE_MAYBE: handleParticipateMaybe,
+	BUTTON_CHANGE_ANSWER:     handleChangeAnswer,
 	BUTTON_EDIT_WAR:          handleEditWar,
 	SELECT_CANCEL_WAR:        handleCancelWarSelect,
 }
@@ -357,16 +358,128 @@ func handleParticipation(ctx *common.ModuleContext, i *discordgo.InteractionCrea
 	// Reply to user
 	if oldParticipation == "" {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
-			fmt.Sprintf("✅ Resposta registrada: **%s**", participationText), 1*time.Second)
+			fmt.Sprintf("✅ Resposta registrada: **%s**", participationText), 5*time.Second)
 	} else {
 		discordutils.ReplyEphemeralMessage(ctx.Session(), i,
-			fmt.Sprintf("✅ Resposta alterada para: **%s**", participationText), 1*time.Second)
+			fmt.Sprintf("✅ Resposta alterada para: **%s**", participationText), 5*time.Second)
 	}
 
 	// Update player's private message
 	err = updatePlayerMessage(ctx, war, playerID, participation)
 	if err != nil {
 		log.Printf("Error updating player message: %v", err)
+	}
+}
+
+// Handle changing war participation answer
+func handleChangeAnswer(ctx *common.ModuleContext, i *discordgo.InteractionCreate) {
+	log.Printf("User %s (%s) clicked change answer button", i.Member.User.Username, i.Member.User.ID)
+
+	// Extract war ID from custom ID (format: war_change_answer:WAR_ID)
+	parts := strings.Split(i.MessageComponentData().CustomID, ":")
+	if len(parts) < 2 {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro interno: ID inválido.", 5*time.Second)
+		return
+	}
+
+	warID := parts[1]
+
+	// Get war from database
+	war, err := types.GetWarByID(ctx.Context, ctx.DB(), warID)
+	if err != nil || war == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Guerra não encontrada.", 5*time.Second)
+		return
+	}
+
+	// Check if war is still active
+	if war.Status != types.WarStatusActive {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Esta guerra já foi finalizada.", 5*time.Second)
+		return
+	}
+
+	playerID := i.Member.User.ID
+
+	// Get player info
+	player, err := types.GetPlayerByDiscordID(ctx.Context, ctx.DB(), playerID)
+	if err != nil || player == nil {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Jogador não encontrado.", 5*time.Second)
+		return
+	}
+
+	// Check if this is the player's ticket channel
+	if player.TicketChannel != i.ChannelID {
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Você só pode alterar sua resposta no seu próprio ticket.", 5*time.Second)
+		return
+	}
+
+	// Create embed with current status
+	embed := createPlayerWarEmbed(war)
+
+	// Add current participation status if exists
+	if currentParticipation, exists := war.Participations[playerID]; exists {
+		participationText := getParticipationText(currentParticipation)
+		participationEmoji := getParticipationEmoji(currentParticipation)
+
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Resposta Atual",
+			Value:  fmt.Sprintf("%s **%s**", participationEmoji, participationText),
+			Inline: false,
+		})
+	}
+
+	// Create participation buttons
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					CustomID: fmt.Sprintf("war_participate:yes:%s", war.ID.Hex()),
+					Label:    "Sim",
+					Style:    discordgo.SuccessButton,
+					Emoji: &discordgo.ComponentEmoji{
+						Name: EMOJI_YES,
+					},
+				},
+				discordgo.Button{
+					CustomID: fmt.Sprintf("war_participate:no:%s", war.ID.Hex()),
+					Label:    "Não",
+					Style:    discordgo.DangerButton,
+					Emoji: &discordgo.ComponentEmoji{
+						Name: EMOJI_NO,
+					},
+				},
+				discordgo.Button{
+					CustomID: fmt.Sprintf("war_participate:maybe:%s", war.ID.Hex()),
+					Label:    "Talvez",
+					Style:    discordgo.SecondaryButton,
+					Emoji: &discordgo.ComponentEmoji{
+						Name: EMOJI_MAYBE,
+					},
+				},
+			},
+		},
+	}
+
+	// Update the message with the participation options
+	edit := &discordgo.MessageEdit{
+		Channel:    i.ChannelID,
+		ID:         i.Message.ID,
+		Embeds:     &[]*discordgo.MessageEmbed{embed},
+		Components: &components,
+	}
+
+	_, err = ctx.Session().ChannelMessageEditComplex(edit)
+	if err != nil {
+		log.Printf("Error updating message with participation options: %v", err)
+		discordutils.ReplyEphemeralMessage(ctx.Session(), i, "❌ Erro ao exibir opções de participação.", 5*time.Second)
+		return
+	}
+
+	// Acknowledge the interaction
+	err = ctx.Session().InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
+	})
+	if err != nil {
+		log.Printf("Error acknowledging interaction: %v", err)
 	}
 }
 
@@ -453,6 +566,8 @@ func HandleWarAction(ctx *common.ModuleContext, guildID string) func(*discordgo.
 				if len(parts) >= 2 {
 					handlerKey = "war_participate:" + parts[1]
 				}
+			} else if strings.HasPrefix(data.CustomID, "war_change_answer:") {
+				handlerKey = BUTTON_CHANGE_ANSWER
 			} else if strings.Contains(data.CustomID, ":") {
 				parts := strings.Split(data.CustomID, ":")
 				if len(parts) >= 2 {
